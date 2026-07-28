@@ -1,0 +1,14 @@
+pandas
+numpy
+openpyxl
+pyarrow
+lxml
+rapidfuzz
+matplotlib
+seaborn
+pytest
+pytest-cov
+jupyter
+ipykernel
+python-dateutil
+pytest-mock
