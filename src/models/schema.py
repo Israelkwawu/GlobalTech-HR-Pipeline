@@ -5,7 +5,7 @@ This module provides reusable helpers for validating and enforcing
 DataFrame schemas. It is intentionally generic so it can support
 multiple schema definitions (e.g., employee, payroll, benefits).
 
-Author: Israel
+Author: Israel Kwawu
 """
 
 from __future__ import annotations
