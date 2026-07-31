@@ -80,29 +80,32 @@ Generate HR insights:
 
 # 4. Architecture
 
-             DATA SOURCES
-                  |
-    +-------------+-------------+
-    |             |             |
-   CSV           JSON          XLSX
-    |             |             |
-    +-------------+-------------+
-                  |
-          INGESTION LAYER
-                  |
-          CLEANING LAYER
-                  |
-        DEDUPLICATION ENGINE
-                  |
-         VALIDATION ENGINE
-                  |
-    +-------------+-------------+
-    |             |             |
+## 4. Architecture
 
-Golden Dataset Reports Review Files
-Parquet HTML/CSV CSV Outputs
+```text
+DATA SOURCES
+      |
++-----+-----+-----+-----+
+|           |           |
+CSV        JSON       XLSX
+|           |           |
++-----------+-----------+
+            |
+    INGESTION LAYER
+            |
+     CLEANING LAYER
+            |
+  DEDUPLICATION ENGINE
+            |
+   VALIDATION ENGINE
+            |
++-----------+-----------+
+|           |           |
+Golden   Reports   Review Files
+Dataset           
 
-
+Parquet   HTML/CSV   CSV
+```
 ---
 
 # 5. Technology Stack
@@ -122,7 +125,7 @@ Parquet HTML/CSV CSV Outputs
 
 # 6. Project Structure
 
-
+```text
 globaltech-hr-pipeline/
 
 ├── pipeline.py
@@ -159,300 +162,116 @@ globaltech-hr-pipeline/
 ├── tests/
 │
 └── docs/
-
+```
 
 ---
+
 
 # 7. Pipeline Workflow
 
 ## Step 1: Ingestion
 
-Loads:
-
-- Workday CSV
-- BambooHR JSON
-- ADP Excel
-- MedShield XML
-
-
-Example:
-
 ```python
 load_globaltech_hris()
-load_acquiredco_api()
+load_acquiredco_hris()
 load_payroll()
 load_benefits()
 ```
 
-Output:
+## Step 2: Cleaning
 
-Standardized DataFrames.
+- Name standardization
+- Employee ID resolution
+- Currency normalization
+- Department mapping
 
-Step 2: Cleaning
-Name Standardization
+## Step 3: Deduplication
 
-Examples:
+- Exact Employee ID
+- Email matching
+- Fuzzy name matching (≥88%)
 
-Before:
+## Step 4: Validation
 
-o'BRIEN, john
+- NOT NULL checks
+- UNIQUE checks
+- Regex validation
+- Allowed values
+- Salary range validation
+- Date validation
+- Manager relationship checks
 
-After:
+---
 
-John O'Brien
-Employee ID Resolution
+# 8. Outputs
 
-Problem:
+- Golden Employee Dataset (Parquet)
+- Ghost Employee Report
+- Probable Match Review
+- Validation Reports
+- EDA Dashboard
 
-1042
+---
 
-exists in both companies.
+# 9. Installation
 
-Solution:
-
-GlobalTech:
-
-GT-001042
-
-
-AcquiredCo:
-
-AC-001042
-Currency Normalization
-
-Supported currencies:
-
-USD
-EUR
-GBP
-
-Output column:
-
-salary_usd_annual
-Step 3: Deduplication
-
-The pipeline uses three matching passes.
-
-Pass 1: Exact Employee ID
-
-Highest confidence.
-
-Example:
-
-GT-001042 = GT-001042
-Pass 2: Email Matching
-
-Example:
-
-john.smith@email.com
-Pass 3: Fuzzy Matching
-
-Uses:
-
-Employee name similarity
-Hire date proximity
-
-Threshold:
-
-Similarity >= 88%
-
-Matches are sent for HR review.
-
-Step 4: Data Validation
-
-The pipeline performs:
-
-NOT NULL checks
-UNIQUE checks
-Regex validation
-Allowed value checks
-Salary range validation
-Date validation
-Manager relationship checks
-
-Minimum checks:
-
-12+
-
-Pipeline gate:
-
-PASS:
-
-Failed checks <= 2
-
-FAIL:
-
-Failed checks > 2
-8. Outputs
-Golden Employee Dataset
-
-Location:
-
-outputs/golden_dataset/
-
-Format:
-
-Parquet
-
-Contains:
-
-Clean employee records
-Deduplicated employees
-Source lineage
-Salary normalization
-
-Example:
-
-employee_id
-first_name
-last_name
-department
-salary_usd_annual
-source_systems
-dedup_method
-Ghost Employee Report
-
-Location:
-
-outputs/review/ghost_employees.csv
-
-Contains:
-
-Payroll employees without HRIS records.
-
-Purpose:
-
-Fraud detection
-Payroll compliance
-Probable Match Review
-
-Location:
-
-outputs/review/probable_matches.csv
-
-Contains:
-
-Matching candidates
-Similarity score
-Hire date difference
-Recommended action
-Validation Reports
-
-Generated:
-
-outputs/reports/
-
-Files:
-
-validation_report.csv
-validation_report.html
-eda_dashboard.png
-9. Installation
-Clone Repository
+```bash
 git clone <repository-url>
-
 cd globaltech-hr-pipeline
-Create Virtual Environment
 python -m venv .venv
+```
 
 Activate:
 
-Windows
-.venv\Scripts\activate
-Linux/Mac
-source .venv/bin/activate
-Install Dependencies
+- Windows: `.venv\Scripts\activate`
+- Linux/macOS: `source .venv/bin/activate`
+
+```bash
 pip install -r requirements.txt
-10. Running the Pipeline
+```
 
-Execute:
+# 10. Running the Pipeline
 
+```bash
 python pipeline.py
+```
 
-Example output:
+# 11. Testing
 
-=====================================
-GLOBALTECH HR DATA PIPELINE
-=====================================
-
-Loading HRIS data...
-✓ GlobalTech HRIS loaded
-
-Loading AcquiredCo data...
-✓ BambooHR data loaded
-
-Loading Payroll...
-✓ Payroll loaded
-
-Cleaning records...
-✓ Transformation complete
-
-Running deduplication...
-✓ Duplicate analysis complete
-
-Running validation...
-✓ Validation passed
-
-Exporting dataset...
-✓ Golden dataset generated
-
-Pipeline completed successfully
-11. Testing
-
-Run all tests:
-
+```bash
 pytest tests -v
+```
 
-Expected:
+# 12. Configuration
 
-==============================
-XX passed
-==============================
-12. Configuration
+- `config/settings.py`
+- `config/exchange_rates.py`
+- `config/department_mapping.py`
 
-Important configuration files:
+# 13. Known Limitations
 
-Exchange Rates
-config/exchange_rates.py
+- Fixed exchange rates
+- Fuzzy matches require HR review
+- Benefits data covers only GlobalTech
+- API ingestion simulated with JSON
 
-Defines currency conversion.
+# 14. Future Improvements
 
-Department Mapping
-config/department_mapping.py
+- Apache Airflow
+- Cloud data warehouse
+- Great Expectations
+- ML entity resolution
+- HR analytics dashboard
+- Automated lineage
 
-Maps source departments into the unified taxonomy.
-
-Pipeline Settings
-config/settings.py
-
-Contains:
-
-File paths
-Validation thresholds
-Output locations
-13. Known Limitations
-Currency conversion uses fixed exchange rates.
-Fuzzy matches require HR confirmation.
-Benefits data only covers GlobalTech employees.
-Department mappings require periodic maintenance.
-API ingestion is simulated using local JSON files.
-14. Future Improvements
-
-Possible enhancements:
-
-Deploy pipeline using Apache Airflow
-Store data in a cloud warehouse
-Add Great Expectations validation
-Add ML-based entity resolution
-Build HR analytics dashboard
-Add automated data lineage tracking
-15. Author
+# 15. Author
 
 GlobalTech HR Data Engineering Team
 
-16. License
+# 16. License
 
 Internal enterprise project.
 
+---
 
-This README is suitable for a capstone submission, GitHub portfolio, or an interview walkthrough because it
+This README is suitable for a capstone submission, GitHub portfolio, or interview walkthrough because it demonstrates real-world data engineering practices including ingestion, transformation, entity resolution, validation, testing, and documentation.
