@@ -2,16 +2,16 @@
 
 ## 1. Overview
 
-The GlobalTech HR Data Integration Pipeline consolidates employee data from multiple HR and business systems into a single trusted Golden Employee Dataset.
+The GlobalTech HR Data Integration Pipeline consolidates employee data from multiple HR and business systems into a single trusted **Golden Employee Dataset**.
 
-The pipeline integrates:
+### Integrated Sources
 
 - GlobalTech HRIS (Workday CSV export)
 - AcquiredCo HRIS (BambooHR JSON API)
 - Combined Payroll System (ADP Excel export)
 - Benefits Provider (MedShield XML export)
 
-The purpose is to support:
+### Business Objectives
 
 - Day 1 merger integration planning
 - Payroll migration
@@ -21,34 +21,34 @@ The purpose is to support:
 
 ---
 
-# 2. Architecture Design
+## 2. Architecture Design
 
-The pipeline follows a modular ETL architecture:
-Sources
-|
-v
-Ingestion Layer
-|
-v
-Cleaning & Transformation
-|
-v
-Deduplication Engine
-|
-v
-Data Quality Validation
-|
-v
-Export & Reporting
+The pipeline follows a modular ETL architecture.
 
+```text
+DATA SOURCES
+      |
+      v
+INGESTION LAYER
+      |
+      v
+CLEANING & TRANSFORMATION
+      |
+      v
+DEDUPLICATION ENGINE
+      |
+      v
+DATA QUALITY VALIDATION
+      |
+      v
+EXPORT & REPORTING
+```
 
 ---
 
-# 3. Pipeline Layers
+## 3. Pipeline Layers
 
-## 3.1 Ingestion Layer
-
-Responsible for loading raw data from different systems.
+### 3.1 Ingestion Layer
 
 Responsibilities:
 
@@ -59,15 +59,9 @@ Responsibilities:
 - Add source metadata
 - Handle malformed records
 
-Output:
+**Output:** Standardized Pandas DataFrames.
 
-Standardized Pandas DataFrames.
-
----
-
-## 3.2 Cleaning Layer
-
-Responsible for data normalization.
+### 3.2 Cleaning Layer
 
 Processes:
 
@@ -81,45 +75,35 @@ Processes:
 Example:
 
 Before:
+
+```text
 Employee ID: 1042
 Company: AcquiredCo
-
+```
 
 After:
 
-
+```text
 Employee ID: AC-001042
+```
 
+### 3.3 Deduplication Layer
 
----
+#### Pass 1: Employee ID Match
 
-## 3.3 Deduplication Layer
+Highest-confidence match.
 
-Uses multiple matching strategies.
-
-### Pass 1: Employee ID Match
-
-Highest confidence match.
-
-Example:
-
+```text
 GT-001042 == GT-001042
+```
 
----
+#### Pass 2: Email Match
 
-### Pass 2: Email Match
-
-Cross-system matching.
-
-Example:
-
-
+```text
 john.smith@company.com
+```
 
-
----
-
-### Pass 3: Fuzzy Matching
+#### Pass 3: Fuzzy Matching
 
 Uses:
 
@@ -128,17 +112,15 @@ Uses:
 
 Library:
 
-
+```text
 rapidfuzz
+```
 
+Potential matches are flagged for HR review.
 
-Records are flagged for HR review.
+### 3.4 Validation Layer
 
----
-
-## 3.4 Validation Layer
-
-The validation framework performs:
+Validation includes:
 
 - Completeness checks
 - Uniqueness checks
@@ -146,19 +128,15 @@ The validation framework performs:
 - Range validation
 - Referential integrity
 
-The pipeline fails if more than two critical checks fail.
+The pipeline fails if more than two critical validation checks fail.
 
 ---
 
-# 4. Output Architecture
+## 4. Output Architecture
 
-## Golden Dataset
+### Golden Dataset
 
-Format:
-
-
-Parquet
-
+**Format:** `Parquet`
 
 Contains:
 
@@ -167,11 +145,9 @@ Contains:
 - Source lineage
 - Standardized fields
 
----
+### Review Outputs
 
-## Review Outputs
-
-### Ghost Employees
+#### Ghost Employees
 
 Payroll employees without HRIS records.
 
@@ -180,15 +156,13 @@ Purpose:
 - Fraud detection
 - Payroll compliance
 
----
+#### Probable Matches
 
-### Probable Matches
-
-Employees requiring manual review.
+Employees requiring manual HR review.
 
 ---
 
-# 5. Technology Stack
+## 5. Technology Stack
 
 | Component | Technology |
 |---|---|
@@ -202,9 +176,9 @@ Employees requiring manual review.
 
 ---
 
-# 6. Design Principles
+## 6. Design Principles
 
-The pipeline follows:
+The pipeline emphasizes:
 
 - Separation of concerns
 - Configuration-driven processing
