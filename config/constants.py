@@ -90,6 +90,9 @@ MONTHLY = "Monthly"
 BI_WEEKLY = "Bi-Weekly"
 WEEKLY = "Weekly"
 HOURLY = "Hourly"
+DAILY = "Daily"
+SEMI_MONTHLY = "Semi-Monthly"
+QUARTERLY = "Quarterly"
 
 PAY_FREQUENCIES = (
     ANNUAL,
@@ -97,6 +100,9 @@ PAY_FREQUENCIES = (
     BI_WEEKLY,
     WEEKLY,
     HOURLY,
+    DAILY,
+    SEMI_MONTHLY,
+    QUARTERLY,
 )
 
 # Annualization factors
@@ -105,6 +111,10 @@ PAY_FREQUENCY_MULTIPLIERS = {
     MONTHLY: 12,
     BI_WEEKLY: 26,
     WEEKLY: 52,
+    HOURLY: 2080,
+    DAILY: 260,
+    SEMI_MONTHLY: 24,
+    QUARTERLY: 4,
 }
 
 # ============================================================================
