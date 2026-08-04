@@ -27,8 +27,9 @@ from config.exchange_rates import (
 )
 
 from config.department_mapping import (
+    GLOBALTECH_DEPARTMENT_MAP,
+    ACQUIREDCO_DEPARTMENT_MAP,
     STANDARD_DEPARTMENTS,
-    DEPARTMENT_MAP,
 )
 
 from config.settings import (
@@ -138,10 +139,8 @@ def test_all_exchange_rates_are_positive():
 
 
 def test_department_mapping_not_empty():
-
-    assert len(
-        DEPARTMENT_MAP
-    ) > 0
+    assert len(GLOBALTECH_DEPARTMENT_MAP) > 0
+    assert len(ACQUIREDCO_DEPARTMENT_MAP) > 0
 
 
 def test_standard_departments_exist():
@@ -159,12 +158,11 @@ def test_standard_departments_exist():
 
 def test_department_mapping_values_are_standard():
 
-    for department in DEPARTMENT_MAP.values():
+    for value in GLOBALTECH_DEPARTMENT_MAP.values():
+        assert value in STANDARD_DEPARTMENTS
 
-        assert (
-            department
-            in STANDARD_DEPARTMENTS
-        )
+    for value in ACQUIREDCO_DEPARTMENT_MAP.values():
+        assert value in STANDARD_DEPARTMENTS
 
 
 # ============================================================================

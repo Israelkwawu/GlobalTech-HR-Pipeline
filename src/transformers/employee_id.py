@@ -19,18 +19,16 @@ import pandas as pd
 
 from config.logging_config import get_logger
 
+from config.constants import (
+    COMPANY_ID_PREFIXES,
+    EMPLOYEE_ID_PATTERN,
+    GLOBALTECH,
+    ACQUIREDCO,
+    COMPANY_ID_PREFIXES,
+    EMPLOYEE_ID_PATTERN,
+)
+
 logger = get_logger(__name__)
-
-EMPLOYEE_ID_PATTERN = re.compile(r"^(GT|AC)-\d{6}$")
-
-COMPANY_PREFIX = {
-    "GlobalTech": "GT",
-    "AcquiredCo": "AC",
-    "globaltech": "GT",
-    "acquiredco": "AC",
-    "GT": "GT",
-    "AC": "AC",
-}
 
 
 def namespace_employee_id(
@@ -49,12 +47,25 @@ def namespace_employee_id(
     if pd.isna(employee_id):
         return None
 
-    prefix = COMPANY_PREFIX.get(company)
+    company_lookup = {
+        "globaltech": GLOBALTECH,
+        "gt": GLOBALTECH,
+        "acquiredco": ACQUIREDCO,
+        "ac": ACQUIREDCO,
+    }
 
-    if prefix is None:
+    normalized_company = company_lookup.get(
+        str(company).strip().lower()
+    )
+
+    if normalized_company is None:
         raise ValueError(
             f"Unsupported company '{company}'."
         )
+
+    prefix = COMPANY_ID_PREFIXES[
+        normalized_company
+    ]
 
     digits = re.sub(r"\D", "", str(employee_id))
 

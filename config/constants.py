@@ -8,6 +8,7 @@ Author: Israel
 """
 
 from __future__ import annotations
+import re
 
 # ============================================================================
 # Pipeline Metadata
@@ -172,15 +173,34 @@ MAX_FAILED_VALIDATION_CHECKS = 2
 # Date Formats
 # ============================================================================
 
-DATE_FORMAT_GLOBALTECH = "%Y-%m-%d"
-DATE_FORMAT_ACQUIREDCO = "%m/%d/%Y"
-DATE_FORMAT_BENEFITS = "%d-%b-%Y"
+# GlobalTech HRIS CSV
+# Example: 21/09/2016
+DATE_FORMAT_GLOBALTECH = "%d/%m/%Y"
+
+# AcquiredCo JSON API
+# Example: 2024-06-27T00:00:00
+DATE_FORMAT_ACQUIREDCO = "%Y-%m-%dT%H:%M:%S"
+
+# Benefits XML
+# Example: 2024-03-23
+DATE_FORMAT_BENEFITS = "%Y-%m-%d"
+
+# Payroll Excel
+# Example: 2023-05-12
+DATE_FORMAT_PAYROLL = "%Y-%m-%d"
 
 SUPPORTED_DATE_FORMATS = (
     DATE_FORMAT_GLOBALTECH,
     DATE_FORMAT_ACQUIREDCO,
     DATE_FORMAT_BENEFITS,
+    DATE_FORMAT_PAYROLL,
 )
+
+# ============================================================================
+# ISO Date Format
+# ============================================================================
+
+ISO_DATE_FORMAT = "%Y-%m-%d"
 
 # ============================================================================
 # File Formats
@@ -206,6 +226,19 @@ ACQUIREDCO_EMPLOYEE_ID_REGEX = r"^AC-\d{6}$"
 
 EMPLOYEE_ID_REGEX = (
     r"^(GT|AC)-\d{6}$"
+)
+
+# ============================================================================
+# Employee ID Configuration
+# ============================================================================
+
+COMPANY_ID_PREFIXES = {
+    GLOBALTECH: GLOBALTECH_ID_PREFIX,
+    ACQUIREDCO: ACQUIREDCO_ID_PREFIX,
+}
+
+EMPLOYEE_ID_PATTERN = re.compile(
+    EMPLOYEE_ID_REGEX
 )
 
 # ============================================================================

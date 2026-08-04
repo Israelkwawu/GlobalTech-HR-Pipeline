@@ -1,37 +1,73 @@
 timestamp,source_system,file_name,record_identifier,error_type,error_message,raw_record
-2026-08-03T08:42:56.413091+00:00,globaltech_hris,missing.csv,,FileNotFoundError,File not found: missing.csv,None
-2026-08-03T08:42:56.432725+00:00,globaltech_hris,employees.txt,,ValueError,Unsupported file extension '.txt'. Expected one of ['.csv'].,None
-2026-08-03T08:42:56.560944+00:00,acquiredco_hris,missing.json,,FileNotFoundError,File not found: missing.json,None
-2026-08-03T08:42:56.560944+00:00,acquiredco_hris,employees.csv,,ValueError,Unsupported file extension '.csv'. Expected one of ['.json'].,None
-2026-08-03T08:42:56.595914+00:00,acquiredco_hris,bad.json,,JSONDecodeError,Expecting property name enclosed in double quotes: line 1 column 2 (char 1),None
-2026-08-03T08:43:01.592421+00:00,payroll,missing.xlsx,,FileNotFoundError,File not found: missing.xlsx,None
-2026-08-03T08:43:01.607243+00:00,payroll,payroll.csv,,ValueError,Unsupported file extension '.csv'. Expected one of ['.xlsx'].,None
-2026-08-03T08:43:01.821209+00:00,benefits,missing.xml,,FileNotFoundError,File not found: missing.xml,None
-2026-08-03T08:43:01.827323+00:00,benefits,benefits.txt,,ValueError,Unsupported file extension '.txt'. Expected one of ['.xml'].,None
-2026-08-03T08:49:36.241784+00:00,globaltech_hris,missing.csv,,FileNotFoundError,File not found: missing.csv,None
-2026-08-03T08:49:36.278924+00:00,globaltech_hris,employees.txt,,ValueError,Unsupported file extension '.txt'. Expected one of ['.csv'].,None
-2026-08-03T08:49:36.400967+00:00,acquiredco_hris,missing.json,,FileNotFoundError,File not found: missing.json,None
-2026-08-03T08:49:36.409416+00:00,acquiredco_hris,employees.csv,,ValueError,Unsupported file extension '.csv'. Expected one of ['.json'].,None
-2026-08-03T08:49:36.416899+00:00,acquiredco_hris,bad.json,,JSONDecodeError,Expecting property name enclosed in double quotes: line 1 column 2 (char 1),None
-2026-08-03T08:49:40.819273+00:00,payroll,missing.xlsx,,FileNotFoundError,File not found: missing.xlsx,None
-2026-08-03T08:49:40.826030+00:00,payroll,payroll.csv,,ValueError,Unsupported file extension '.csv'. Expected one of ['.xlsx'].,None
-2026-08-03T08:49:41.039306+00:00,benefits,missing.xml,,FileNotFoundError,File not found: missing.xml,None
-2026-08-03T08:49:41.050809+00:00,benefits,benefits.txt,,ValueError,Unsupported file extension '.txt'. Expected one of ['.xml'].,None
-2026-08-03T09:27:13.229398+00:00,globaltech_hris,missing.csv,,FileNotFoundError,File not found: missing.csv,None
-2026-08-03T09:27:13.254564+00:00,globaltech_hris,employees.txt,,ValueError,Unsupported file extension '.txt'. Expected one of ['.csv'].,None
-2026-08-03T09:27:13.480193+00:00,acquiredco_hris,missing.json,,FileNotFoundError,File not found: missing.json,None
-2026-08-03T09:27:13.487192+00:00,acquiredco_hris,employees.csv,,ValueError,Unsupported file extension '.csv'. Expected one of ['.json'].,None
-2026-08-03T09:27:13.532387+00:00,acquiredco_hris,bad.json,,JSONDecodeError,Expecting property name enclosed in double quotes: line 1 column 2 (char 1),None
-2026-08-03T09:27:17.898365+00:00,payroll,missing.xlsx,,FileNotFoundError,File not found: missing.xlsx,None
-2026-08-03T09:27:17.918476+00:00,payroll,payroll.csv,,ValueError,Unsupported file extension '.csv'. Expected one of ['.xlsx'].,None
-2026-08-03T09:27:18.117359+00:00,benefits,missing.xml,,FileNotFoundError,File not found: missing.xml,None
-2026-08-03T09:27:18.127954+00:00,benefits,benefits.txt,,ValueError,Unsupported file extension '.txt'. Expected one of ['.xml'].,None
-2026-08-03T09:33:06.289065+00:00,globaltech_hris,missing.csv,,FileNotFoundError,File not found: missing.csv,None
-2026-08-03T09:33:06.314086+00:00,globaltech_hris,employees.txt,,ValueError,Unsupported file extension '.txt'. Expected one of ['.csv'].,None
-2026-08-03T09:33:06.450690+00:00,acquiredco_hris,missing.json,,FileNotFoundError,File not found: missing.json,None
-2026-08-03T09:33:06.456715+00:00,acquiredco_hris,employees.csv,,ValueError,Unsupported file extension '.csv'. Expected one of ['.json'].,None
-2026-08-03T09:33:06.460759+00:00,acquiredco_hris,bad.json,,JSONDecodeError,Expecting property name enclosed in double quotes: line 1 column 2 (char 1),None
-2026-08-03T09:33:10.626794+00:00,payroll,missing.xlsx,,FileNotFoundError,File not found: missing.xlsx,None
-2026-08-03T09:33:10.643908+00:00,payroll,payroll.csv,,ValueError,Unsupported file extension '.csv'. Expected one of ['.xlsx'].,None
-2026-08-03T09:33:10.812090+00:00,benefits,missing.xml,,FileNotFoundError,File not found: missing.xml,None
-2026-08-03T09:33:10.829470+00:00,benefits,benefits.txt,,ValueError,Unsupported file extension '.txt'. Expected one of ['.xml'].,None
+2026-08-04T08:45:58.125422+00:00,globaltech_hris,missing.csv,,FileNotFoundError,File not found: missing.csv,None
+2026-08-04T08:45:58.140893+00:00,globaltech_hris,employees.txt,,ValueError,Unsupported file extension '.txt'. Expected one of ['.csv'].,None
+2026-08-04T08:45:58.379031+00:00,acquiredco_hris,missing.json,,FileNotFoundError,File not found: missing.json,None
+2026-08-04T08:45:58.389230+00:00,acquiredco_hris,employees.csv,,ValueError,Unsupported file extension '.csv'. Expected one of ['.json'].,None
+2026-08-04T08:45:58.427046+00:00,acquiredco_hris,bad.json,,JSONDecodeError,Expecting property name enclosed in double quotes: line 1 column 2 (char 1),None
+2026-08-04T08:46:05.664862+00:00,payroll,missing.xlsx,,FileNotFoundError,File not found: missing.xlsx,None
+2026-08-04T08:46:05.687661+00:00,payroll,payroll.csv,,ValueError,Unsupported file extension '.csv'. Expected one of ['.xlsx'].,None
+2026-08-04T08:46:06.137335+00:00,benefits,missing.xml,,FileNotFoundError,File not found: missing.xml,None
+2026-08-04T08:46:06.147027+00:00,benefits,benefits.txt,,ValueError,Unsupported file extension '.txt'. Expected one of ['.xml'].,None
+2026-08-04T13:14:08.747696+00:00,globaltech_hris,missing.csv,,FileNotFoundError,File not found: missing.csv,None
+2026-08-04T13:14:08.784166+00:00,globaltech_hris,employees.txt,,ValueError,Unsupported file extension '.txt'. Expected one of ['.csv'].,None
+2026-08-04T13:14:09.030840+00:00,acquiredco_hris,missing.json,,FileNotFoundError,File not found: missing.json,None
+2026-08-04T13:14:09.053012+00:00,acquiredco_hris,employees.csv,,ValueError,Unsupported file extension '.csv'. Expected one of ['.json'].,None
+2026-08-04T13:14:09.085544+00:00,acquiredco_hris,bad.json,,JSONDecodeError,Expecting property name enclosed in double quotes: line 1 column 2 (char 1),None
+2026-08-04T13:14:16.449159+00:00,payroll,missing.xlsx,,FileNotFoundError,File not found: missing.xlsx,None
+2026-08-04T13:14:16.463140+00:00,payroll,payroll.csv,,ValueError,Unsupported file extension '.csv'. Expected one of ['.xlsx'].,None
+2026-08-04T13:14:16.748800+00:00,benefits,missing.xml,,FileNotFoundError,File not found: missing.xml,None
+2026-08-04T13:14:16.768299+00:00,benefits,benefits.txt,,ValueError,Unsupported file extension '.txt'. Expected one of ['.xml'].,None
+2026-08-04T13:27:33.026011+00:00,globaltech_hris,missing.csv,,FileNotFoundError,File not found: missing.csv,None
+2026-08-04T13:27:33.256689+00:00,globaltech_hris,employees.txt,,ValueError,Unsupported file extension '.txt'. Expected one of ['.csv'].,None
+2026-08-04T13:27:33.495096+00:00,acquiredco_hris,missing.json,,FileNotFoundError,File not found: missing.json,None
+2026-08-04T13:27:33.512505+00:00,acquiredco_hris,employees.csv,,ValueError,Unsupported file extension '.csv'. Expected one of ['.json'].,None
+2026-08-04T13:27:33.547320+00:00,acquiredco_hris,bad.json,,JSONDecodeError,Expecting property name enclosed in double quotes: line 1 column 2 (char 1),None
+2026-08-04T13:27:41.343323+00:00,payroll,missing.xlsx,,FileNotFoundError,File not found: missing.xlsx,None
+2026-08-04T13:27:41.360511+00:00,payroll,payroll.csv,,ValueError,Unsupported file extension '.csv'. Expected one of ['.xlsx'].,None
+2026-08-04T13:27:41.784700+00:00,benefits,missing.xml,,FileNotFoundError,File not found: missing.xml,None
+2026-08-04T13:27:41.801650+00:00,benefits,benefits.txt,,ValueError,Unsupported file extension '.txt'. Expected one of ['.xml'].,None
+2026-08-04T13:31:04.450572+00:00,globaltech_hris,missing.csv,,FileNotFoundError,File not found: missing.csv,None
+2026-08-04T13:31:04.477753+00:00,globaltech_hris,employees.txt,,ValueError,Unsupported file extension '.txt'. Expected one of ['.csv'].,None
+2026-08-04T13:31:04.735629+00:00,acquiredco_hris,missing.json,,FileNotFoundError,File not found: missing.json,None
+2026-08-04T13:31:04.778548+00:00,acquiredco_hris,employees.csv,,ValueError,Unsupported file extension '.csv'. Expected one of ['.json'].,None
+2026-08-04T13:31:04.813447+00:00,acquiredco_hris,bad.json,,JSONDecodeError,Expecting property name enclosed in double quotes: line 1 column 2 (char 1),None
+2026-08-04T13:31:14.437124+00:00,payroll,missing.xlsx,,FileNotFoundError,File not found: missing.xlsx,None
+2026-08-04T13:31:14.457110+00:00,payroll,payroll.csv,,ValueError,Unsupported file extension '.csv'. Expected one of ['.xlsx'].,None
+2026-08-04T13:31:14.807973+00:00,benefits,missing.xml,,FileNotFoundError,File not found: missing.xml,None
+2026-08-04T13:31:14.834333+00:00,benefits,benefits.txt,,ValueError,Unsupported file extension '.txt'. Expected one of ['.xml'].,None
+2026-08-04T13:40:17.164017+00:00,globaltech_hris,missing.csv,,FileNotFoundError,File not found: missing.csv,None
+2026-08-04T13:40:17.231987+00:00,globaltech_hris,employees.txt,,ValueError,Unsupported file extension '.txt'. Expected one of ['.csv'].,None
+2026-08-04T13:40:17.675360+00:00,acquiredco_hris,missing.json,,FileNotFoundError,File not found: missing.json,None
+2026-08-04T13:40:17.699257+00:00,acquiredco_hris,employees.csv,,ValueError,Unsupported file extension '.csv'. Expected one of ['.json'].,None
+2026-08-04T13:40:17.723649+00:00,acquiredco_hris,bad.json,,JSONDecodeError,Expecting property name enclosed in double quotes: line 1 column 2 (char 1),None
+2026-08-04T13:40:27.691203+00:00,payroll,missing.xlsx,,FileNotFoundError,File not found: missing.xlsx,None
+2026-08-04T13:40:27.710425+00:00,payroll,payroll.csv,,ValueError,Unsupported file extension '.csv'. Expected one of ['.xlsx'].,None
+2026-08-04T13:40:28.082551+00:00,benefits,missing.xml,,FileNotFoundError,File not found: missing.xml,None
+2026-08-04T13:40:28.098318+00:00,benefits,benefits.txt,,ValueError,Unsupported file extension '.txt'. Expected one of ['.xml'].,None
+2026-08-04T13:44:54.140657+00:00,globaltech_hris,missing.csv,,FileNotFoundError,File not found: missing.csv,None
+2026-08-04T13:44:54.175180+00:00,globaltech_hris,employees.txt,,ValueError,Unsupported file extension '.txt'. Expected one of ['.csv'].,None
+2026-08-04T13:44:54.450545+00:00,acquiredco_hris,missing.json,,FileNotFoundError,File not found: missing.json,None
+2026-08-04T13:44:54.469554+00:00,acquiredco_hris,employees.csv,,ValueError,Unsupported file extension '.csv'. Expected one of ['.json'].,None
+2026-08-04T13:44:54.475474+00:00,acquiredco_hris,bad.json,,JSONDecodeError,Expecting property name enclosed in double quotes: line 1 column 2 (char 1),None
+2026-08-04T13:45:05.766175+00:00,payroll,missing.xlsx,,FileNotFoundError,File not found: missing.xlsx,None
+2026-08-04T13:45:05.797787+00:00,payroll,payroll.csv,,ValueError,Unsupported file extension '.csv'. Expected one of ['.xlsx'].,None
+2026-08-04T13:45:06.267270+00:00,benefits,missing.xml,,FileNotFoundError,File not found: missing.xml,None
+2026-08-04T13:45:06.282008+00:00,benefits,benefits.txt,,ValueError,Unsupported file extension '.txt'. Expected one of ['.xml'].,None
+2026-08-04T13:50:08.651292+00:00,globaltech_hris,missing.csv,,FileNotFoundError,File not found: missing.csv,None
+2026-08-04T13:50:08.676053+00:00,globaltech_hris,employees.txt,,ValueError,Unsupported file extension '.txt'. Expected one of ['.csv'].,None
+2026-08-04T13:50:08.989872+00:00,acquiredco_hris,missing.json,,FileNotFoundError,File not found: missing.json,None
+2026-08-04T13:50:09.011568+00:00,acquiredco_hris,employees.csv,,ValueError,Unsupported file extension '.csv'. Expected one of ['.json'].,None
+2026-08-04T13:50:09.070076+00:00,acquiredco_hris,bad.json,,JSONDecodeError,Expecting property name enclosed in double quotes: line 1 column 2 (char 1),None
+2026-08-04T13:50:19.699412+00:00,payroll,missing.xlsx,,FileNotFoundError,File not found: missing.xlsx,None
+2026-08-04T13:50:19.716158+00:00,payroll,payroll.csv,,ValueError,Unsupported file extension '.csv'. Expected one of ['.xlsx'].,None
+2026-08-04T13:50:20.210881+00:00,benefits,missing.xml,,FileNotFoundError,File not found: missing.xml,None
+2026-08-04T13:50:20.228380+00:00,benefits,benefits.txt,,ValueError,Unsupported file extension '.txt'. Expected one of ['.xml'].,None
+2026-08-04T13:59:16.474752+00:00,globaltech_hris,missing.csv,,FileNotFoundError,File not found: missing.csv,None
+2026-08-04T13:59:16.531900+00:00,globaltech_hris,employees.txt,,ValueError,Unsupported file extension '.txt'. Expected one of ['.csv'].,None
+2026-08-04T13:59:16.940582+00:00,acquiredco_hris,missing.json,,FileNotFoundError,File not found: missing.json,None
+2026-08-04T13:59:16.956285+00:00,acquiredco_hris,employees.csv,,ValueError,Unsupported file extension '.csv'. Expected one of ['.json'].,None
+2026-08-04T13:59:17.011600+00:00,acquiredco_hris,bad.json,,JSONDecodeError,Expecting property name enclosed in double quotes: line 1 column 2 (char 1),None
+2026-08-04T13:59:27.151952+00:00,payroll,missing.xlsx,,FileNotFoundError,File not found: missing.xlsx,None
+2026-08-04T13:59:27.165487+00:00,payroll,payroll.csv,,ValueError,Unsupported file extension '.csv'. Expected one of ['.xlsx'].,None
+2026-08-04T13:59:27.541966+00:00,benefits,missing.xml,,FileNotFoundError,File not found: missing.xml,None
+2026-08-04T13:59:27.554988+00:00,benefits,benefits.txt,,ValueError,Unsupported file extension '.txt'. Expected one of ['.xml'].,None
