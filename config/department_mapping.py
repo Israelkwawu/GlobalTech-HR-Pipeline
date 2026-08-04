@@ -11,133 +11,44 @@ Sources:
 Author: Israel Kwawu
 """
 
+from __future__ import annotations
 
-# ============================================================================
-# Standard Department Taxonomy
-# ============================================================================
-
-STANDARD_DEPARTMENTS = (
+STANDARD_DEPARTMENTS = {
     "Engineering",
-    "Product",
-    "Marketing",
-    "Sales",
     "Finance",
     "Human Resources",
-    "Operations",
-    "Legal",
-    "Customer Success",
     "Information Technology",
-)
-
-
-# ============================================================================
-# GlobalTech Department Code Mapping
-# ============================================================================
+    "Legal",
+    "Manufacturing",
+    "Marketing",
+    "Operations",
+    "Product",
+    "Sales",
+    "Strategy",
+    "Supply Chain",
+    "Customer Support",
+}
 
 GLOBALTECH_DEPARTMENT_MAP = {
-
-    "ENG-01": "Engineering",
-
-    "PROD-01": "Product",
-
-    "MKT-03": "Marketing",
-
-    "SAL-01": "Sales",
-
-    "FIN-01": "Finance",
-
-    "HR-01": "Human Resources",
-
-    "OPS-01": "Operations",
-
-    "LEG-01": "Legal",
-
-    "CS-01": "Customer Success",
-
-    "IT-01": "Information Technology",
+    "Engineering": "Engineering",
+    "Manufacturing": "Manufacturing",
+    "Strategy": "Strategy",
+    "IT": "Information Technology",
+    "Finance": "Finance",
+    "HR": "Human Resources",
+    "Operations": "Operations",
+    "Marketing": "Marketing",
+    "Sales": "Sales",
 }
-
-
-# ============================================================================
-# AcquiredCo Department Mapping
-# ============================================================================
 
 ACQUIREDCO_DEPARTMENT_MAP = {
-
     "Engineering": "Engineering",
-
-    "Software Engineering": "Engineering",
-
-    "Product Management": "Product",
-
-    "Marketing": "Marketing",
-
-    "Sales": "Sales",
-
-    "Accounting": "Finance",
-
+    "Product": "Product",
     "Finance": "Finance",
-
-    "People Operations": "Human Resources",
-
     "Human Resources": "Human Resources",
-
+    "Marketing": "Marketing",
+    "Sales": "Sales",
     "Operations": "Operations",
-
-    "Legal": "Legal",
-
-    "Customer Support": "Customer Success",
+    "Customer Success": "Customer Support",
 }
 
-
-# ============================================================================
-# Combined Lookup Mapping
-# ============================================================================
-
-DEPARTMENT_MAP = {
-    **GLOBALTECH_DEPARTMENT_MAP,
-    **ACQUIREDCO_DEPARTMENT_MAP,
-}
-
-
-# ============================================================================
-# Helper Functions
-# ============================================================================
-
-def normalize_department(
-    department: str,
-) -> str | None:
-    """
-    Convert a source department value into
-    the standard taxonomy.
-
-    Parameters
-    ----------
-    department : str
-        Source department code or name
-
-    Returns
-    -------
-    str | None
-        Standard department name or None if unmapped
-    """
-
-    if not department:
-        return None
-
-    department = department.strip()
-
-    return DEPARTMENT_MAP.get(
-        department
-    )
-
-
-def is_valid_department(
-    department: str,
-) -> bool:
-    """
-    Check whether a department belongs
-    to the standard taxonomy.
-    """
-
-    return department in STANDARD_DEPARTMENTS
