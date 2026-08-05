@@ -220,3 +220,5 @@ __marimo__/
 # Excel temporary files
 ~$*.xlsx
 ~$*.xls
+
+data/dead_letter/*
