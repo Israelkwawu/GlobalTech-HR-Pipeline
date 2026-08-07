@@ -14,7 +14,6 @@ Author: Israel Kwawu
 
 from pathlib import Path
 
-
 # ============================================================================
 # Project Root
 # ============================================================================
@@ -58,38 +57,24 @@ REPORT_OUTPUT_DIR = OUTPUT_DIR / "reports"
 # Source File Locations
 # ============================================================================
 
-GLOBALTECH_HRIS_FILE = (
-    RAW_DATA_DIR / "globaltech_hris.csv"
-)
+GLOBALTECH_HRIS_FILE = RAW_DATA_DIR / "globaltech_hris.csv"
 
-ACQUIREDCO_HRIS_FILE = (
-    RAW_DATA_DIR / "acquiredco_hris.json"
-)
+ACQUIREDCO_HRIS_FILE = RAW_DATA_DIR / "acquiredco_hris.json"
 
-PAYROLL_FILE = (
-    RAW_DATA_DIR / "payroll.xlsx"
-)
+PAYROLL_FILE = RAW_DATA_DIR / "payroll.xlsx"
 
-BENEFITS_FILE = (
-    RAW_DATA_DIR / "benefits.xml"
-)
+BENEFITS_FILE = RAW_DATA_DIR / "benefits.xml"
 
 
 # ============================================================================
 # Intermediate Pipeline Outputs
 # ============================================================================
 
-INGESTED_DATA_DIR = (
-    PROCESSED_DATA_DIR / "ingested"
-)
+INGESTED_DATA_DIR = PROCESSED_DATA_DIR / "ingested"
 
-CLEANED_DATA_DIR = (
-    PROCESSED_DATA_DIR / "cleaned"
-)
+CLEANED_DATA_DIR = PROCESSED_DATA_DIR / "cleaned"
 
-DEDUPLICATED_DATA_DIR = (
-    PROCESSED_DATA_DIR / "deduplicated"
-)
+DEDUPLICATED_DATA_DIR = PROCESSED_DATA_DIR / "deduplicated"
 
 
 # ============================================================================
@@ -158,6 +143,7 @@ FAIL_PIPELINE_ON_VALIDATION_ERROR = True
 # Helper Functions
 # ============================================================================
 
+
 def create_project_directories() -> None:
     """
     Create required project directories if they do not exist.
@@ -188,4 +174,3 @@ def create_project_directories() -> None:
             parents=True,
             exist_ok=True,
         )
-        

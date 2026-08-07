@@ -125,4 +125,3 @@ def test_multiple_invalid_rows():
     result = validator.validate(df)
 
     assert len(result) == 2
-    

@@ -24,7 +24,6 @@ from src.models.employee_schema import (
 
 from src.models.schema import SchemaValidationError
 
-
 # ============================================================================
 # Schema Definition Tests
 # ============================================================================
@@ -62,9 +61,7 @@ def test_employee_columns_are_unique():
     Ensure schema does not contain duplicate columns.
     """
 
-    assert len(EMPLOYEE_COLUMNS) == len(
-        set(EMPLOYEE_COLUMNS)
-    )
+    assert len(EMPLOYEE_COLUMNS) == len(set(EMPLOYEE_COLUMNS))
 
 
 def test_required_fields_are_in_columns():
@@ -151,17 +148,9 @@ def test_schema_rejects_missing_required_fields():
     Missing required fields should raise an error.
     """
 
-    df = pd.DataFrame(
-        {
-            "employee_id": [
-                "GT-001042"
-            ]
-        }
-    )
+    df = pd.DataFrame({"employee_id": ["GT-001042"]})
 
-    with pytest.raises(
-        SchemaValidationError
-    ):
+    with pytest.raises(SchemaValidationError):
         EMPLOYEE_SCHEMA.validate_columns(df)
 
 
@@ -172,31 +161,16 @@ def test_schema_adds_optional_columns():
 
     df = pd.DataFrame(
         {
-            "employee_id": [
-                "GT-001042"
-            ],
-            "first_name": [
-                "John"
-            ],
-            "last_name": [
-                "Smith"
-            ],
-            "email": [
-                "john@test.com"
-            ],
-            "department": [
-                "Engineering"
-            ],
-            "country": [
-                "USA"
-            ],
+            "employee_id": ["GT-001042"],
+            "first_name": ["John"],
+            "last_name": ["Smith"],
+            "email": ["john@test.com"],
+            "department": ["Engineering"],
+            "country": ["USA"],
         }
     )
 
-    result = EMPLOYEE_SCHEMA.add_missing_optional_columns(
-        df
-    )
+    result = EMPLOYEE_SCHEMA.add_missing_optional_columns(df)
 
     assert "salary" in result.columns
     assert "manager_id" in result.columns
-    

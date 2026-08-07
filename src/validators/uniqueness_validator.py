@@ -52,15 +52,7 @@ class UniquenessValidator(BaseValidator):
             # Ignore null/blank values
             # ---------------------------------
 
-            valid = df[
-                df[column].notna()
-                & (
-                    df[column]
-                    .astype(str)
-                    .str.strip()
-                    != ""
-                )
-            ]
+            valid = df[df[column].notna() & (df[column].astype(str).str.strip() != "")]
 
             if valid.empty:
                 continue
@@ -70,10 +62,7 @@ class UniquenessValidator(BaseValidator):
             # ---------------------------------
 
             duplicate_groups = (
-                valid[
-                    valid[column]
-                    .duplicated(keep=False)
-                ]
+                valid[valid[column].duplicated(keep=False)]
                 .groupby(column)
                 .first()
                 .reset_index()
@@ -85,12 +74,9 @@ class UniquenessValidator(BaseValidator):
                     self.error(
                         row=row,
                         rule="DUPLICATE",
-                        message=(
-                            f"Duplicate value '{row[column]}'"
-                        ),
+                        message=(f"Duplicate value '{row[column]}'"),
                         column=column,
                     )
                 )
 
         return pd.DataFrame(errors)
-    

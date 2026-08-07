@@ -3,10 +3,9 @@ Ghost employee detection.
 
 Responsibilities
 ----------------
-- Detect payroll records missing from HR
-- Detect benefits records missing from HR
-- Detect orphan records
-- Produce ghost employee report
+- Detect payroll employees missing from HRIS
+- Detect benefits employees missing from HRIS
+- Produce compliance review files
 
 Author: Israel Kwawu
 """
@@ -15,97 +14,192 @@ from __future__ import annotations
 
 import pandas as pd
 
+from datetime import datetime
+
 from config.logging_config import get_logger
 
 logger = get_logger(__name__)
 
 
-def detect_ghost_records(
-    reference_df: pd.DataFrame,
-    candidate_df: pd.DataFrame,
-    id_column: str = "employee_id",
-    source: str = "Unknown",
-) -> pd.DataFrame:
+# ============================================================
+# Normalize IDs
+# ============================================================
+
+
+def normalize_match_id(
+    value,
+):
     """
-    Detect records that exist in candidate_df
-    but not in reference_df.
+    Convert IDs to comparable numeric values.
+
+    GT-001042 -> 1042
+    AC-001042 -> 1042
+    1042 -> 1042
     """
 
-    if id_column not in reference_df.columns:
-        raise KeyError(f"Missing '{id_column}' in reference dataset.")
+    if pd.isna(value):
+        return None
 
-    if id_column not in candidate_df.columns:
-        raise KeyError(f"Missing '{id_column}' in candidate dataset.")
+    value = str(value).strip()
 
-    logger.info(
-        "Checking %s for ghost employees...",
-        source,
-    )
+    digits = "".join(c for c in value if c.isdigit())
 
-    ghosts = candidate_df[
-        ~candidate_df[id_column].isin(
-            reference_df[id_column]
-        )
-    ].copy()
+    if not digits:
+        return None
 
-    ghosts["ghost_employee"] = True
-    ghosts["ghost_source"] = source
+    return int(digits)
 
-    logger.info(
-        "%s ghost employees found.",
-        len(ghosts),
-    )
 
-    return ghosts
+# ============================================================
+# Payroll Ghost Detection
+# ============================================================
 
 
 def detect_payroll_ghosts(
-    employee_df: pd.DataFrame,
-    payroll_df: pd.DataFrame,
+    employees: pd.DataFrame,
+    payroll: pd.DataFrame,
 ) -> pd.DataFrame:
     """
-    Detect payroll employees
-    missing from HR.
+    Detect payroll records without HRIS employees.
+
+    Compliance requirement:
+
+    Payroll employee without HRIS record
+    = ghost employee
     """
 
-    return detect_ghost_records(
-        employee_df,
-        payroll_df,
-        source="Payroll",
+    logger.info("Starting payroll ghost detection...")
+
+    employees = employees.copy()
+
+    payroll = payroll.copy()
+
+    # ------------------------------------------
+    # Create matching keys
+    # ------------------------------------------
+
+    employees["match_id"] = employees["employee_id"].apply(normalize_match_id)
+
+    payroll["match_id"] = payroll["employee_id"].apply(normalize_match_id)
+
+    # ------------------------------------------
+    # Find payroll only records
+    # ------------------------------------------
+
+    ghosts = payroll[~payroll["match_id"].isin(employees["match_id"])].copy()
+
+    if ghosts.empty:
+
+        logger.info("No payroll ghosts detected.")
+
+        return pd.DataFrame()
+
+    # ------------------------------------------
+    # Compliance fields
+    # ------------------------------------------
+
+    ghosts["ghost_employee"] = True
+
+    ghosts["ghost_reason"] = "Payroll record has no matching HRIS employee"
+
+    ghosts["detected_at"] = datetime.utcnow()
+
+    ghosts["source_system"] = "payroll"
+
+    logger.warning(
+        """
+Payroll ghost employees detected.
+
+Count=%s
+""",
+        len(ghosts),
     )
+
+    return ghosts.drop(
+        columns=["match_id"],
+        errors="ignore",
+    )
+
+
+# ============================================================
+# Benefits Ghost Detection
+# ============================================================
 
 
 def detect_benefits_ghosts(
-    employee_df: pd.DataFrame,
-    benefits_df: pd.DataFrame,
-) -> pd.DataFrame:
-    """
-    Detect benefits employees
-    missing from HR.
-    """
+    employees: pd.DataFrame,
+    benefits: pd.DataFrame,
+):
 
-    return detect_ghost_records(
-        employee_df,
-        benefits_df,
-        source="Benefits",
+    employees = employees.copy()
+
+    benefits = benefits.copy()
+
+    employees["match_id"] = employees["employee_id"].apply(normalize_match_id)
+
+    benefits["match_id"] = benefits["employee_id"].apply(normalize_match_id)
+
+    ghosts = benefits[~benefits["match_id"].isin(employees["match_id"])].copy()
+
+    if ghosts.empty:
+
+        return pd.DataFrame()
+
+    ghosts["ghost_employee"] = True
+
+    ghosts["ghost_reason"] = "Benefits record has no matching HRIS employee"
+
+    ghosts["detected_at"] = datetime.utcnow()
+
+    ghosts["source_system"] = "benefits"
+
+    logger.warning(
+        "Benefits ghosts detected=%s",
+        len(ghosts),
     )
+
+    return ghosts.drop(
+        columns=["match_id"],
+        errors="ignore",
+    )
+
+
+# ============================================================
+# Combine Reports
+# ============================================================
 
 
 def combine_ghost_reports(
-    *reports: pd.DataFrame,
-) -> pd.DataFrame:
-    """
-    Combine multiple ghost reports.
-    """
+    payroll_ghosts,
+    benefits_ghosts,
+):
+
+    reports = []
+
+    if not payroll_ghosts.empty:
+
+        reports.append(payroll_ghosts)
+
+    if not benefits_ghosts.empty:
+
+        reports.append(benefits_ghosts)
 
     if not reports:
+
         return pd.DataFrame()
 
-    return (
-        pd.concat(
-            reports,
-            ignore_index=True,
-        )
-        .drop_duplicates()
+    result = pd.concat(
+        reports,
+        ignore_index=True,
     )
-    
+
+    logger.info(
+        """
+Ghost employee report generated.
+
+Total=%s
+""",
+        len(result),
+    )
+
+    return result

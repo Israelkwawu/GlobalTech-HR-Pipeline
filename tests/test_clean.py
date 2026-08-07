@@ -106,4 +106,3 @@ def test_clean_pipeline_returns_dataframe():
         result,
         pd.DataFrame,
     )
-    

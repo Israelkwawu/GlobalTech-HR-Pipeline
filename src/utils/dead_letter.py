@@ -92,9 +92,7 @@ def write_dead_letter(
     _initialize_dead_letter_file()
 
     row = {
-        "timestamp": datetime.now(
-            timezone.utc
-        ).isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "source_system": source_system,
         "file_name": file_name,
         "record_identifier": record_identifier,
@@ -149,5 +147,3 @@ def clear_dead_letter_log() -> None:
         DEAD_LETTER_FILE.unlink()
 
     logger.info("Dead-letter log cleared.")
-    
-    

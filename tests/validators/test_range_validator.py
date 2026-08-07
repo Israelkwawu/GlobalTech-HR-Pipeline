@@ -144,4 +144,3 @@ def test_multiple_invalid_values():
         "BELOW_MINIMUM",
         "ABOVE_MAXIMUM",
     }
-    

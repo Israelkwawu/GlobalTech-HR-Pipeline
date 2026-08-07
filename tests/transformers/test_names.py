@@ -11,9 +11,7 @@ from src.transformers.names import (
 
 def test_clean_whitespace():
 
-    assert clean_whitespace(
-        "  John   Smith  "
-    ) == "John Smith"
+    assert clean_whitespace("  John   Smith  ") == "John Smith"
 
 
 def test_unicode_normalization():
@@ -25,51 +23,37 @@ def test_unicode_normalization():
 
 def test_title_case():
 
-    assert title_case_name(
-        "john smith"
-    ) == "John Smith"
+    assert title_case_name("john smith") == "John Smith"
 
 
 def test_apostrophe():
 
-    assert title_case_name(
-        "o'brien"
-    ) == "O'Brien"
+    assert title_case_name("o'brien") == "O'Brien"
 
 
 def test_hyphenated():
 
-    assert title_case_name(
-        "anne-marie"
-    ) == "Anne-Marie"
+    assert title_case_name("anne-marie") == "Anne-Marie"
 
 
 def test_van_der_berg():
 
-    assert title_case_name(
-        "van der berg"
-    ) == "Van der Berg"
+    assert title_case_name("van der berg") == "Van der Berg"
 
 
 def test_de_la_cruz():
 
-    assert title_case_name(
-        "de la cruz"
-    ) == "De la Cruz"
+    assert title_case_name("de la cruz") == "De la Cruz"
 
 
 def test_multiple_spaces():
 
-    assert standardize_name(
-        "   john      smith   "
-    ) == "John Smith"
+    assert standardize_name("   john      smith   ") == "John Smith"
 
 
 def test_none_value():
 
-    assert pd.isna(
-        standardize_name(None)
-    )
+    assert pd.isna(standardize_name(None))
 
 
 def test_dataframe_standardization():
@@ -100,11 +84,7 @@ def test_dataframe_standardization():
 
 def test_missing_column():
 
-    df = pd.DataFrame(
-        {
-            "employee_id": [1, 2]
-        }
-    )
+    df = pd.DataFrame({"employee_id": [1, 2]})
 
     result = standardize_names(df)
 
@@ -123,4 +103,3 @@ def test_returns_new_dataframe():
     result = standardize_names(df)
 
     assert result is not df
-    

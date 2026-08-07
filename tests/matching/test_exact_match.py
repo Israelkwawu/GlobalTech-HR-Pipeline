@@ -20,7 +20,6 @@ def test_exact_employee_match():
         }
     )
 
-
     right = pd.DataFrame(
         {
             "employee_id": [
@@ -34,25 +33,13 @@ def test_exact_employee_match():
         }
     )
 
-
     result = exact_employee_match(
         left,
         right,
     )
 
-
     assert len(result) == 1
 
-    assert (
-        result.iloc[0]["employee_id"]
-        ==
-        "GT-000001"
-    )
+    assert result.iloc[0]["employee_id"] == "GT-000001"
 
-
-    assert (
-        result.iloc[0]["match_method"]
-        ==
-        "exact_id"
-    )
-    
+    assert result.iloc[0]["match_method"] == "exact_id"

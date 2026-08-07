@@ -112,10 +112,7 @@ def title_case_name(value: str | None) -> str | None:
 
         for hyphen_piece in word.split("-"):
 
-            apostrophe_parts = [
-                part.capitalize()
-                for part in hyphen_piece.split("'")
-            ]
+            apostrophe_parts = [part.capitalize() for part in hyphen_piece.split("'")]
 
             pieces.append("'".join(apostrophe_parts))
 
@@ -179,9 +176,6 @@ def standardize_names(
             column,
         )
 
-        df[column] = df[column].apply(
-            standardize_name
-        )
+        df[column] = df[column].apply(standardize_name)
 
     return df
-

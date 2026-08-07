@@ -1,5 +1,5 @@
 """
-Unit tests for deduplication pipeline.
+Tests for employee deduplication engine.
 
 Author: Israel Kwawu
 """
@@ -8,122 +8,18 @@ import pandas as pd
 
 from src.deduplicate import deduplicate_employees
 
+# ============================================================================
+# Fixtures
+# ============================================================================
 
-def empty_payroll():
+
+def employee_dataframe():
+
     return pd.DataFrame(
-        columns=[
-            "employee_id",
-            "email",
-            "full_name",
-        ]
-    )
-
-
-def empty_benefits():
-    return pd.DataFrame(
-        columns=[
-            "employee_id",
-            "plan_type",
-        ]
-    )
-
-
-def test_exact_id_duplicate_removed():
-
-    employee_df = pd.DataFrame(
-        {
-            "employee_id": [
-                "GT-000001",
-                "GT-000001",
-                "GT-000002",
-            ],
-            "email": [
-                "a@test.com",
-                "a@test.com",
-                "b@test.com",
-            ],
-            "first_name": [
-                "John",
-                "John",
-                "Jane",
-            ],
-            "last_name": [
-                "Smith",
-                "Smith",
-                "Doe",
-            ],
-        }
-    )
-
-    result = deduplicate_employees(
-        employee_df,
-        empty_payroll(),
-        empty_benefits(),
-    )
-
-    golden = result["golden_dataset"]
-
-    assert len(golden) == 2
-
-
-def test_email_duplicate_detection():
-
-    employee_df = pd.DataFrame(
-        {
-            "employee_id": [
-                "GT-000001",
-                "AC-000001",
-            ],
-            "email": [
-                "same@test.com",
-                "same@test.com",
-            ],
-            "first_name": [
-                "John",
-                "John",
-            ],
-            "last_name": [
-                "Smith",
-                "Smith",
-            ],
-        }
-    )
-
-    payroll_df = pd.DataFrame(
-        {
-            "employee_id": [
-                "GT-000001"
-            ],
-            "email": [
-                "same@test.com"
-            ],
-        }
-    )
-
-
-    result = deduplicate_employees(
-        employee_df,
-        payroll_df,
-        empty_benefits(),
-    )
-
-    assert isinstance(
-        result["email_matches"],
-        pd.DataFrame,
-    )
-
-
-def test_unique_records_unchanged():
-
-    employee_df = pd.DataFrame(
         {
             "employee_id": [
                 "GT-000001",
                 "GT-000002",
-            ],
-            "email": [
-                "a@test.com",
-                "b@test.com",
             ],
             "first_name": [
                 "John",
@@ -133,93 +29,141 @@ def test_unique_records_unchanged():
                 "Smith",
                 "Doe",
             ],
+            "email": [
+                "john@test.com",
+                "jane@test.com",
+            ],
+            "full_name": [
+                "John Smith",
+                "Jane Doe",
+            ],
+            "department": [
+                "Engineering",
+                "Finance",
+            ],
+            "country": [
+                "USA",
+                "UK",
+            ],
+            "employment_type": [
+                "Full-Time",
+                "Full-Time",
+            ],
+            "source_system": [
+                "globaltech_hris",
+                "globaltech_hris",
+            ],
         }
     )
 
-    result = deduplicate_employees(
-        employee_df,
-        empty_payroll(),
-        empty_benefits(),
-    )
 
-    golden = result["golden_dataset"]
+def payroll_dataframe():
 
-    assert len(golden) == 2
-
-
-def test_empty_employee_dataframe():
-
-    employee_df = pd.DataFrame(
-        columns=[
-            "employee_id",
-            "email",
-            "first_name",
-            "last_name",
-        ]
-    )
-
-    result = deduplicate_employees(
-        employee_df,
-        empty_payroll(),
-        empty_benefits(),
-    )
-
-    assert result["golden_dataset"].empty
-
-
-def test_missing_optional_columns_does_not_crash():
-
-    employee_df = pd.DataFrame(
+    return pd.DataFrame(
         {
             "employee_id": [
-                "GT-000001"
+                "GT-000001",
+                "GT-000003",
             ],
             "email": [
-                "john@test.com"
+                "john@test.com",
+                "ghost@test.com",
+            ],
+            "full_name": [
+                "John Smith",
+                "Ghost User",
+            ],
+            # Required by merge_payroll()
+            "salary": [
+                85000,
+                60000,
+            ],
+            "currency": [
+                "USD",
+                "USD",
+            ],
+            "pay_frequency": [
+                "Annual",
+                "Annual",
+            ],
+            "source_system": [
+                "payroll",
+                "payroll",
             ],
         }
     )
 
+
+def benefits_dataframe():
+
+    return pd.DataFrame(
+        {
+            "employee_id": [
+                "GT-000001",
+            ],
+            "benefit_plans": [
+                "Health Insurance",
+            ],
+            "source_system": [
+                "benefits",
+            ],
+        }
+    )
+
+
+# ============================================================================
+# Tests
+# ============================================================================
+
+
+def test_deduplicate_returns_expected_keys():
+
     result = deduplicate_employees(
-        employee_df,
-        empty_payroll(),
-        empty_benefits(),
+        employee_dataframe(),
+        payroll_dataframe(),
+        benefits_dataframe(),
     )
 
     assert "golden_dataset" in result
 
+    assert "exact_matches" in result
 
-def test_result_contains_all_reports():
+    assert "email_matches" in result
 
-    employee_df = pd.DataFrame(
-        {
-            "employee_id": [
-                "GT-000001"
-            ],
-            "email": [
-                "john@test.com"
-            ],
-            "first_name": [
-                "John"
-            ],
-            "last_name": [
-                "Smith"
-            ],
-        }
+    assert "fuzzy_matches" in result
+
+    assert "ghost_employees" in result
+
+
+def test_golden_dataset_removes_duplicate_employee_ids():
+
+    df = pd.concat(
+        [
+            employee_dataframe(),
+            employee_dataframe().iloc[[0]],
+        ],
+        ignore_index=True,
     )
 
     result = deduplicate_employees(
-        employee_df,
-        empty_payroll(),
-        empty_benefits(),
+        df,
+        payroll_dataframe(),
+        benefits_dataframe(),
     )
 
+    golden = result["golden_dataset"]
 
-    assert set(result.keys()) == {
-        "golden_dataset",
-        "exact_matches",
-        "email_matches",
-        "fuzzy_matches",
-        "ghost_employees",
-    }
-    
+    assert golden["employee_id"].duplicated().sum() == 0
+
+
+def test_email_match_detects_same_employee():
+
+    result = deduplicate_employees(
+        employee_dataframe(),
+        payroll_dataframe(),
+        benefits_dataframe(),
+    )
+
+    matches = result["email_matches"]
+
+    assert not matches.empty

@@ -35,10 +35,37 @@ logger = get_logger(__name__)
 # Source Date Formats
 # ============================================================================
 
+"""
+IMPORTANT:
+
+These keys use the canonical schema names AFTER alignment.
+
+Example:
+
+AcquiredCo:
+hire_timestamp
+        |
+        v
+align_employee_schema()
+        |
+        v
+hire_date
+
+Therefore we normalize:
+(acquiredco_hris, hire_date)
+
+not:
+(acquiredco_hris, hire_timestamp)
+"""
+
 DATE_COLUMN_FORMATS = {
+    # GlobalTech HRIS CSV
     ("globaltech_hris", "hire_date"): DATE_FORMAT_GLOBALTECH,
-    ("acquiredco_hris", "hire_timestamp"): DATE_FORMAT_ACQUIREDCO,
+    # AcquiredCo JSON API
+    ("acquiredco_hris", "hire_date"): DATE_FORMAT_ACQUIREDCO,
+    # Benefits XML
     ("benefits", "enrollment_date"): DATE_FORMAT_BENEFITS,
+    # Payroll Excel
     ("payroll", "effective_date"): DATE_FORMAT_PAYROLL,
 }
 
@@ -47,68 +74,166 @@ DATE_COLUMN_FORMATS = {
 # Single Value Functions
 # ============================================================================
 
+
 def parse_date(
-    value: str | None,
+    value: str | datetime | pd.Timestamp | None,
     source: str,
     column: str,
 ) -> datetime | None:
     """
-    Parse a date using the configured source/column format.
+    Parse date from different source systems.
 
-    Parameters
-    ----------
-    value
-        Raw date string.
-
-    source
-        Source system name.
-
-    column
-        Date column name.
-
-    Returns
-    -------
-    datetime | None
+    Supports:
+    - datetime objects
+    - pandas timestamps
+    - configured source formats
+    - ISO dates
+    - ISO datetime timestamps
+    - common HR export formats
     """
+
+    # ------------------------------------------------------------
+    # Empty values
+    # ------------------------------------------------------------
+
+    if value is None:
+
+        return None
+
+    if isinstance(value, float) and pd.isna(value):
+
+        return None
 
     if pd.isna(value):
         return None
 
-    try:
-        fmt = DATE_COLUMN_FORMATS[(source, column)]
-    except KeyError as exc:
-        raise ValueError(
-            f"No date format configured for "
-            f"{source}.{column}"
-        ) from exc
+    # ------------------------------------------------------------
+    # Already parsed dates
+    # ------------------------------------------------------------
+
+    if isinstance(
+        value,
+        pd.Timestamp,
+    ):
+
+        return value.to_pydatetime()
+
+    if isinstance(
+        value,
+        datetime,
+    ):
+
+        return value
+
+    value = str(value).strip()
+
+    if value == "" or value.lower() in {
+        "null",
+        "none",
+        "nan",
+    }:
+
+        return None
+
+    # ------------------------------------------------------------
+    # Configured source format
+    # ------------------------------------------------------------
+
+    fmt = DATE_COLUMN_FORMATS.get(
+        (
+            source,
+            column,
+        )
+    )
+
+    if fmt:
+
+        try:
+
+            return datetime.strptime(
+                value,
+                fmt,
+            )
+
+        except ValueError:
+
+            pass
+
+    # ------------------------------------------------------------
+    # Universal fallback formats
+    # ------------------------------------------------------------
+
+    fallback_formats = [
+        # AcquiredCo JSON
+        # 2024-06-27T00:00:00
+        "%Y-%m-%dT%H:%M:%S",
+        # ISO datetime with milliseconds
+        # 2024-06-27T00:00:00.123
+        "%Y-%m-%dT%H:%M:%S.%f",
+        # Standard datetime
+        # 2016-09-21 00:00:00
+        "%Y-%m-%d %H:%M:%S",
+        # ISO date
+        "%Y-%m-%d",
+        # European format
+        "%d/%m/%Y",
+    ]
+
+    for fmt in fallback_formats:
+
+        try:
+
+            return datetime.strptime(
+                value,
+                fmt,
+            )
+
+        except ValueError:
+
+            continue
+
+    # ------------------------------------------------------------
+    # Pandas final parser
+    # ------------------------------------------------------------
 
     try:
-        return datetime.strptime(
-            str(value).strip(),
-            fmt,
+
+        parsed = pd.to_datetime(
+            value,
+            errors="raise",
         )
 
-    except ValueError as exc:
-        raise ValueError(
-            f"Invalid date '{value}' "
-            f"for {source}.{column}. "
-            f"Expected format {fmt}."
-        ) from exc
+        return parsed.to_pydatetime()
+
+    except Exception as exc:
+
+        raise ValueError(f"Invalid date '{value}' " f"for {source}.{column}") from exc
 
 
 def normalize_date(
-    value: str | None,
+    value: str | datetime | pd.Timestamp | None,
     source: str,
     column: str,
 ) -> str | None:
     """
-    Convert a date into ISO format.
+    Normalize date into ISO format.
 
-    Returns
-    -------
-    str | None
+    Output:
         YYYY-MM-DD
+
+    Invalid or missing dates return None.
     """
+
+    # Handle pandas missing values
+    if value is None or pd.isna(value):
+
+        logger.warning(
+            "Missing date value source=%s column=%s",
+            source,
+            column,
+        )
+
+        return None
 
     dt = parse_date(
         value,
@@ -116,12 +241,19 @@ def normalize_date(
         column,
     )
 
-    if dt is None:
+    # parse_date failed
+    if dt is None or pd.isna(dt):
+
+        logger.warning(
+            "Invalid date value=%s source=%s column=%s",
+            value,
+            source,
+            column,
+        )
+
         return None
 
-    return dt.strftime(
-        ISO_DATE_FORMAT,
-    )
+    return dt.strftime(ISO_DATE_FORMAT)
 
 
 def validate_hire_date(
@@ -131,7 +263,8 @@ def validate_hire_date(
     Validate normalized hire date.
     """
 
-    if pd.isna(value):
+    if value is None:
+
         return False
 
     try:
@@ -142,20 +275,18 @@ def validate_hire_date(
         )
 
     except ValueError:
+
         return False
 
     current_year = datetime.today().year
 
-    return (
-        MIN_HIRE_YEAR
-        <= dt.year
-        <= current_year
-    )
+    return MIN_HIRE_YEAR <= dt.year <= current_year
 
 
 # ============================================================================
 # DataFrame Functions
 # ============================================================================
+
 
 def normalize_date_column(
     df: pd.DataFrame,
@@ -163,15 +294,14 @@ def normalize_date_column(
     column: str,
 ) -> pd.DataFrame:
     """
-    Normalize one date column.
+    Normalize a single date column.
     """
 
     df = df.copy()
 
     if column not in df.columns:
-        raise KeyError(
-            f"Missing column '{column}'."
-        )
+
+        raise KeyError(f"Missing column '{column}'.")
 
     logger.info(
         "Normalizing %s...",
@@ -194,26 +324,27 @@ def normalize_dates(
     source: str,
 ) -> pd.DataFrame:
     """
-    Normalize every supported date column
-    in a DataFrame.
+    Normalize supported date columns.
     """
 
     df = df.copy()
 
-    candidate_columns = (
+    candidate_columns = [
         "hire_date",
         "hire_timestamp",
         "effective_date",
         "enrollment_date",
-    )
+    ]
 
     for column in candidate_columns:
 
         if column not in df.columns:
+
             continue
 
         logger.info(
-            "Normalizing %s...",
+            "Normalizing %s.%s",
+            source,
             column,
         )
 
@@ -233,19 +364,11 @@ def validate_date_column(
     column: str = "hire_date",
 ) -> pd.Series:
     """
-    Validate an entire date column.
-
-    Returns
-    -------
-    pd.Series
-        Boolean validation results.
+    Validate entire date column.
     """
 
     if column not in df.columns:
-        raise KeyError(
-            f"Missing column '{column}'."
-        )
 
-    return df[column].apply(
-        validate_hire_date,
-    )
+        raise KeyError(f"Missing column '{column}'.")
+
+    return df[column].apply(validate_hire_date)

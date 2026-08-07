@@ -52,10 +52,7 @@ def test_fuzzy_match():
 
     assert len(result) == 1
 
-    assert (
-        result.iloc[0]["match_method"]
-        == "fuzzy_name"
-    )
+    assert result.iloc[0]["match_method"] == "fuzzy_name"
 
 
 def test_best_match():
@@ -86,4 +83,3 @@ def test_similarity_with_none():
         )
         == 0
     )
-    

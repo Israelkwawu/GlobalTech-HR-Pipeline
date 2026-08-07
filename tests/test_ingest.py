@@ -25,9 +25,7 @@ RAW_DATA = PROJECT_ROOT / "data" / "raw"
 
 
 def test_load_globaltech_hris():
-    df = load_globaltech_hris(
-        RAW_DATA / "globaltech_hris.csv"
-    )
+    df = load_globaltech_hris(RAW_DATA / "globaltech_hris.csv")
 
     assert isinstance(df, pd.DataFrame)
     assert not df.empty
@@ -55,9 +53,7 @@ def test_globaltech_invalid_extension(tmp_path):
 
 
 def test_load_acquiredco_hris():
-    df = load_acquiredco_hris(
-        RAW_DATA / "acquiredco_api.json"
-    )
+    df = load_acquiredco_hris(RAW_DATA / "acquiredco_api.json")
 
     assert isinstance(df, pd.DataFrame)
     assert not df.empty
@@ -95,9 +91,7 @@ def test_acquiredco_bad_json(tmp_path):
 
 
 def test_load_payroll():
-    df = load_payroll(
-        RAW_DATA / "payroll_data.xlsx"
-    )
+    df = load_payroll(RAW_DATA / "payroll_data.xlsx")
 
     assert isinstance(df, pd.DataFrame)
     assert not df.empty
@@ -124,9 +118,7 @@ def test_payroll_invalid_extension(tmp_path):
 
 
 def test_load_benefits():
-    df = load_benefits(
-        RAW_DATA / "benefits_enrollment.xml"
-    )
+    df = load_benefits(RAW_DATA / "benefits_enrollment.xml")
 
     assert isinstance(df, pd.DataFrame)
     assert not df.empty
@@ -162,9 +154,7 @@ def test_benefits_bad_xml(tmp_path):
 
 
 def test_align_globaltech_schema():
-    df = load_globaltech_hris(
-        RAW_DATA / "globaltech_hris.csv"
-    )
+    df = load_globaltech_hris(RAW_DATA / "globaltech_hris.csv")
 
     aligned = align_employee_schema(
         df,
@@ -177,9 +167,7 @@ def test_align_globaltech_schema():
 
 
 def test_align_acquiredco_schema():
-    df = load_acquiredco_hris(
-        RAW_DATA / "acquiredco_api.json"
-    )
+    df = load_acquiredco_hris(RAW_DATA / "acquiredco_api.json")
 
     aligned = align_employee_schema(
         df,
@@ -192,9 +180,7 @@ def test_align_acquiredco_schema():
 
 
 def test_align_payroll_schema():
-    df = load_payroll(
-        RAW_DATA / "payroll_data.xlsx"
-    )
+    df = load_payroll(RAW_DATA / "payroll_data.xlsx")
 
     aligned = align_employee_schema(
         df,
@@ -206,9 +192,7 @@ def test_align_payroll_schema():
 
 
 def test_align_benefits_schema():
-    df = load_benefits(
-        RAW_DATA / "benefits_enrollment.xml"
-    )
+    df = load_benefits(RAW_DATA / "benefits_enrollment.xml")
 
     aligned = align_employee_schema(
         df,
@@ -230,9 +214,7 @@ def test_align_unknown_source():
 
 
 def test_aligned_columns_are_unique():
-    df = load_globaltech_hris(
-        RAW_DATA / "globaltech_hris.csv"
-    )
+    df = load_globaltech_hris(RAW_DATA / "globaltech_hris.csv")
 
     aligned = align_employee_schema(
         df,
@@ -243,9 +225,7 @@ def test_aligned_columns_are_unique():
 
 
 def test_alignment_returns_dataframe():
-    df = load_globaltech_hris(
-        RAW_DATA / "globaltech_hris.csv"
-    )
+    df = load_globaltech_hris(RAW_DATA / "globaltech_hris.csv")
 
     aligned = align_employee_schema(
         df,
@@ -253,5 +233,3 @@ def test_alignment_returns_dataframe():
     )
 
     assert isinstance(aligned, pd.DataFrame)
-    
-    

@@ -1,160 +1,225 @@
 """
-Salary transformation utilities.
+Salary normalization utilities.
 
-Responsibilities:
-
+Responsibilities
+----------------
+- Normalize salary values
 - Clean salary strings
-- Normalize pay frequency
-- Convert currencies
-- Calculate annual USD salary
+- Convert pay frequency to annual salary
+- Convert currencies to USD
+- Produce salary_usd_annual
+- Preserve original salary columns
+
+Author: Israel Kwawu
 """
 
 from __future__ import annotations
+
 
 import re
 
 import pandas as pd
 
-from src.utils.currency import convert_to_usd
 
 from config.logging_config import get_logger
 
-from config.constants import PAY_FREQUENCY_MULTIPLIERS
-
-
 logger = get_logger(__name__)
 
+
+# ============================================================
+# Currency Conversion
+# ============================================================
+
+
+CURRENCY_RATES_TO_USD = {
+    "USD": 1.0,
+    "EUR": 1.08,
+    "GBP": 1.27,
+}
+
+
+# ============================================================
+# Salary Cleaning
+# ============================================================
+
+
 def clean_salary(
-    value: str | float | int | None,
-) -> float | None:
+    value,
+):
     """
-    Convert salary strings into numbers.
+    Convert salary values into numeric.
 
-    Examples
-    --------
-    "$85,000" -> 85000.0
+    Examples:
 
-    "100000" -> 100000.0
+    "$85,000"
+        -> 85000
+
+
+    "EUR 50,000"
+        -> 50000
     """
 
     if pd.isna(value):
+
         return None
 
-    if isinstance(value, (int, float)):
+    if isinstance(
+        value,
+        (int, float),
+    ):
+
         return float(value)
 
     value = str(value)
 
     value = re.sub(
-        r"[^0-9.]+",
+        r"[^\d.]",
         "",
         value,
     )
 
-    if not value:
+    if value == "":
+
         return None
 
     return float(value)
 
 
-def normalize_frequency(
-    frequency: str | None,
-) -> str | None:
-    """
-    Normalize pay frequency names to canonical values.
-    """
-
-    if frequency is None:
-        return None
-
-    value = (
-        str(frequency)
-        .strip()
-        .lower()
-        .replace("_", "-")
-    )
-
-    mapping = {
-        "annual": "Annual",
-        "yearly": "Annual",
-        "monthly": "Monthly",
-        "bi-weekly": "Bi-Weekly",
-        "biweekly": "Bi-Weekly",
-        "weekly": "Weekly",
-        "hourly": "Hourly",
-        "daily": "Daily",
-        "semi-monthly": "Semi-Monthly",
-        "semimonthly": "Semi-Monthly",
-        "quarterly": "Quarterly",
-    }
-
-    return mapping.get(value)
+# ============================================================
+# Frequency Conversion
+# ============================================================
 
 
-def annual_multiplier(
-    frequency: str,
-) -> int:
-    frequency = normalize_frequency(frequency)
-
-    if frequency is None:
-        raise ValueError("Pay frequency is required.")
-
-    if frequency not in PAY_FREQUENCY_MULTIPLIERS:
-        raise ValueError(
-            f"Unsupported pay frequency: {frequency}"
-        )
-
-    return PAY_FREQUENCY_MULTIPLIERS[frequency]
-
-
-def calculate_annual_salary(
-    salary: float,
-    frequency: str,
-) -> float:
-    """
-    Convert salary to annual amount.
-    """
-
-    return salary * annual_multiplier(
-        frequency
-    )
-
-
-def calculate_salary_usd(
+def annualize_salary(
     salary,
-    currency,
     frequency,
 ):
-    """
-    Calculate annual salary in USD.
-    """
 
-    salary = clean_salary(salary)
+    if pd.isna(salary):
 
-    annual_salary = calculate_annual_salary(
-        salary,
+        return None
+
+    frequency = str(frequency).lower().strip().replace("_", "-").replace(" ", "-")
+
+    multiplier = {
+        "monthly": 12,
+        "month": 12,
+        "monthly-salary": 12,
+        "bi-weekly": 26,
+        "biweekly": 26,
+        "bi-week": 26,
+        "fortnightly": 26,
+        "weekly": 52,
+        "annual": 1,
+        "yearly": 1,
+        "year": 1,
+    }.get(
         frequency,
+        1,
     )
 
-    return convert_to_usd(
-        annual_salary,
-        currency,
+    return salary * multiplier
+
+
+# ============================================================
+# Currency Conversion
+# ============================================================
+
+
+def convert_to_usd(
+    amount,
+    currency,
+):
+
+    if pd.isna(amount):
+
+        return None
+
+    currency = str(currency).upper().strip()
+
+    if currency not in CURRENCY_RATES_TO_USD:
+
+        logger.warning(
+            "Unknown currency '%s'. Defaulting rate=1",
+            currency,
+        )
+
+        rate = 1.0
+
+    else:
+
+        rate = CURRENCY_RATES_TO_USD[currency]
+
+    return round(
+        amount * rate,
+        2,
     )
+
+
+# ============================================================
+# Column Preparation
+# ============================================================
+
+
+def _prepare_salary_columns(
+    df: pd.DataFrame,
+):
+
+    df = df.copy()
+
+    # ADP payroll source
+
+    if "salary" not in df.columns and "base_salary" in df.columns:
+
+        logger.info("Mapping base_salary -> salary")
+
+        df["salary"] = df["base_salary"]
+
+    # Currency aliases
+
+    if "currency" not in df.columns:
+
+        for candidate in [
+            "currency_code",
+            "curr",
+        ]:
+
+            if candidate in df.columns:
+
+                df["currency"] = df[candidate]
+
+                break
+
+    # Frequency aliases
+
+    if "pay_frequency" not in df.columns:
+
+        for candidate in [
+            "frequency",
+            "payment_frequency",
+        ]:
+
+            if candidate in df.columns:
+
+                df["pay_frequency"] = df[candidate]
+
+                break
+
+    return df
+
+
+# ============================================================
+# Main API
+# ============================================================
 
 
 def normalize_salary_columns(
     df: pd.DataFrame,
 ) -> pd.DataFrame:
-    """
-    Add salary_usd_annual column.
-
-    Required columns:
-        salary
-        currency
-        pay_frequency
-    """
 
     df = df.copy()
+
+    df = _prepare_salary_columns(df)
 
     required = {
         "salary",
@@ -165,25 +230,66 @@ def normalize_salary_columns(
     missing = required - set(df.columns)
 
     if missing:
-        raise KeyError(
-            f"Missing columns: {missing}"
+
+        logger.error(
+            "Missing salary columns=%s",
+            missing,
         )
 
+        return df
 
     logger.info(
-        "Normalizing salaries..."
+        "Normalizing salaries rows=%s",
+        len(df),
     )
 
+    # --------------------------------------------------------
+    # Numeric salary
+    # --------------------------------------------------------
 
-    df["salary_usd_annual"] = df.apply(
-        lambda row:
-            calculate_salary_usd(
-                row["salary"],
-                row["currency"],
-                row["pay_frequency"],
-            ),
+    df["salary_numeric"] = df["salary"].apply(clean_salary)
+
+    # --------------------------------------------------------
+    # Annual salary
+    # --------------------------------------------------------
+
+    df["salary_annual"] = df.apply(
+        lambda row: annualize_salary(
+            row["salary_numeric"],
+            row["pay_frequency"],
+        ),
         axis=1,
     )
 
-    return df
+    # --------------------------------------------------------
+    # USD conversion
+    # --------------------------------------------------------
 
+    df["salary_usd_annual"] = df.apply(
+        lambda row: convert_to_usd(
+            row["salary_annual"],
+            row["currency"],
+        ),
+        axis=1,
+    )
+
+    logger.info(
+        """
+SALARY NORMALIZATION COMPLETE
+
+Rows:
+%s
+
+Salary populated:
+%s
+
+USD annual populated:
+%s
+
+""",
+        len(df),
+        df["salary_numeric"].notna().sum(),
+        df["salary_usd_annual"].notna().sum(),
+    )
+
+    return df

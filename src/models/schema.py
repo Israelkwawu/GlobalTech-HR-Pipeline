@@ -56,15 +56,10 @@ class DataFrameSchema:
         SchemaValidationError
             If any required columns are missing.
         """
-        missing = [
-            col for col in self.required_fields
-            if col not in df.columns
-        ]
+        missing = [col for col in self.required_fields if col not in df.columns]
 
         if missing:
-            raise SchemaValidationError(
-                f"Missing required columns: {missing}"
-            )
+            raise SchemaValidationError(f"Missing required columns: {missing}")
 
     def validate_dtypes(self, df: pd.DataFrame) -> None:
         """
@@ -91,9 +86,7 @@ class DataFrameSchema:
                 }
 
         if mismatches:
-            raise SchemaValidationError(
-                f"Schema dtype mismatch: {mismatches}"
-            )
+            raise SchemaValidationError(f"Schema dtype mismatch: {mismatches}")
 
     def enforce_column_order(
         self,
