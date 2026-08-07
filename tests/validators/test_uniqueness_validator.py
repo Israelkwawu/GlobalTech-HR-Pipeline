@@ -145,4 +145,3 @@ def test_null_values_not_duplicates():
 
     # pandas duplicated() ignores NaN for uniqueness checks
     assert result.empty
-    

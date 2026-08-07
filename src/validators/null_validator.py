@@ -13,13 +13,11 @@ class NullValidator(BaseValidator):
 
     name = "null_check"
 
-
     def __init__(
         self,
         required_fields: list[str],
     ):
         self.required_fields = required_fields
-
 
     def validate(
         self,
@@ -48,4 +46,3 @@ class NullValidator(BaseValidator):
                     )
 
         return pd.DataFrame(errors)
-    

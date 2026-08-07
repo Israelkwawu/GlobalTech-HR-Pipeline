@@ -25,6 +25,7 @@ logger = logging.getLogger(__name__)
 # Directory Utilities
 # ============================================================================
 
+
 def ensure_directory(path: str | Path) -> Path:
     """
     Create a directory if it does not already exist.
@@ -50,6 +51,7 @@ def ensure_directory(path: str | Path) -> Path:
 # File Validation
 # ============================================================================
 
+
 def validate_file_exists(path: str | Path) -> Path:
     """
     Validate that a file exists.
@@ -68,14 +70,10 @@ def validate_file_exists(path: str | Path) -> Path:
     file_path = Path(path)
 
     if not file_path.exists():
-        raise FileNotFoundError(
-            f"File not found: {file_path}"
-        )
+        raise FileNotFoundError(f"File not found: {file_path}")
 
     if not file_path.is_file():
-        raise FileNotFoundError(
-            f"Not a file: {file_path}"
-        )
+        raise FileNotFoundError(f"Not a file: {file_path}")
 
     return file_path
 
@@ -102,9 +100,7 @@ def validate_extension(
     suffix = Path(path).suffix.lower()
 
     allowed = {
-        ext.lower()
-        if ext.startswith(".")
-        else f".{ext.lower()}"
+        ext.lower() if ext.startswith(".") else f".{ext.lower()}"
         for ext in allowed_extensions
     }
 
@@ -118,6 +114,7 @@ def validate_extension(
 # ============================================================================
 # File Information
 # ============================================================================
+
 
 def get_file_size(path: str | Path) -> int:
     """
@@ -140,6 +137,7 @@ def is_empty_file(path: str | Path) -> bool:
 # ============================================================================
 # Logging Helpers
 # ============================================================================
+
 
 def log_file_loaded(
     source: str,
@@ -197,6 +195,7 @@ def log_file_error(
 # ============================================================================
 # Generic Helpers
 # ============================================================================
+
 
 def count_records(df) -> int:
     """

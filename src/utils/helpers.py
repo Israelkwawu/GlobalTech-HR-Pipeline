@@ -24,6 +24,7 @@ logger = logging.getLogger(__name__)
 # DataFrame Helpers
 # ============================================================================
 
+
 def add_missing_columns(
     df: pd.DataFrame,
     columns: list[str],
@@ -116,6 +117,7 @@ def standardize_missing_values(
 # Record Helpers
 # ============================================================================
 
+
 def add_source_system(
     df: pd.DataFrame,
     source: str,
@@ -164,6 +166,7 @@ def dataframe_summary(
 # Time Helpers
 # ============================================================================
 
+
 def current_timestamp() -> str:
     """
     Return current UTC timestamp in ISO-8601 format.
@@ -179,6 +182,7 @@ def current_timestamp() -> str:
 # ============================================================================
 # Logging Helpers
 # ============================================================================
+
 
 def log_dataframe_summary(
     name: str,
@@ -197,10 +201,7 @@ def log_dataframe_summary(
     summary = dataframe_summary(df)
 
     logger.info(
-        (
-            "%s | Rows=%s | Columns=%s | "
-            "Missing=%s | Duplicates=%s"
-        ),
+        ("%s | Rows=%s | Columns=%s | " "Missing=%s | Duplicates=%s"),
         name,
         summary["rows"],
         summary["columns"],
@@ -212,6 +213,7 @@ def log_dataframe_summary(
 # ============================================================================
 # Validation Helpers
 # ============================================================================
+
 
 def ensure_dataframe(
     obj,
@@ -225,9 +227,7 @@ def ensure_dataframe(
     """
 
     if not isinstance(obj, pd.DataFrame):
-        raise TypeError(
-            "Expected a pandas DataFrame."
-        )
+        raise TypeError("Expected a pandas DataFrame.")
 
     return obj
 
@@ -244,6 +244,7 @@ def is_dataframe_empty(
     """
 
     return df.empty
+
 
 def log_dataframe_schema(
     name: str,

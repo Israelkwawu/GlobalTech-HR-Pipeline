@@ -20,9 +20,7 @@ def test_no_null_values():
         }
     )
 
-    validator = NullValidator(
-        ["email"]
-    )
+    validator = NullValidator(["email"])
 
     result = validator.validate(df)
 
@@ -40,9 +38,7 @@ def test_detect_null_value():
         }
     )
 
-    validator = NullValidator(
-        ["email"]
-    )
+    validator = NullValidator(["email"])
 
     result = validator.validate(df)
 
@@ -61,9 +57,7 @@ def test_detect_blank_string():
         }
     )
 
-    validator = NullValidator(
-        ["email"]
-    )
+    validator = NullValidator(["email"])
 
     result = validator.validate(df)
 
@@ -73,17 +67,9 @@ def test_detect_blank_string():
 
 def test_missing_required_column():
 
-    df = pd.DataFrame(
-        {
-            "name": [
-                "John"
-            ]
-        }
-    )
+    df = pd.DataFrame({"name": ["John"]})
 
-    validator = NullValidator(
-        ["email"]
-    )
+    validator = NullValidator(["email"])
 
     result = validator.validate(df)
 
@@ -114,4 +100,3 @@ def test_multiple_required_columns():
     result = validator.validate(df)
 
     assert len(result) == 2
-    

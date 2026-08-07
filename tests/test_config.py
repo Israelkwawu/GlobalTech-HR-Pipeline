@@ -38,7 +38,6 @@ from config.settings import (
     OUTPUT_DIR,
 )
 
-
 # ============================================================================
 # Constants Tests
 # ============================================================================
@@ -83,32 +82,20 @@ def test_employment_types_exist():
 
 def test_email_regex_is_valid():
 
-    pattern = re.compile(
-        EMAIL_REGEX
-    )
+    pattern = re.compile(EMAIL_REGEX)
 
-    assert pattern.match(
-        "employee@globaltech.com"
-    )
+    assert pattern.match("employee@globaltech.com")
 
 
 def test_employee_id_regex_is_valid():
 
-    pattern = re.compile(
-        EMPLOYEE_ID_REGEX
-    )
+    pattern = re.compile(EMPLOYEE_ID_REGEX)
 
-    assert pattern.match(
-        "GT-001042"
-    )
+    assert pattern.match("GT-001042")
 
-    assert pattern.match(
-        "AC-001042"
-    )
+    assert pattern.match("AC-001042")
 
-    assert not pattern.match(
-        "001042"
-    )
+    assert not pattern.match("001042")
 
 
 # ============================================================================
@@ -120,10 +107,7 @@ def test_exchange_rates_have_base_currency():
 
     assert BASE_CURRENCY in EXCHANGE_RATES
 
-    assert (
-        EXCHANGE_RATES[BASE_CURRENCY]
-        == 1.00
-    )
+    assert EXCHANGE_RATES[BASE_CURRENCY] == 1.00
 
 
 def test_all_exchange_rates_are_positive():
@@ -145,15 +129,9 @@ def test_department_mapping_not_empty():
 
 def test_standard_departments_exist():
 
-    assert (
-        "Engineering"
-        in STANDARD_DEPARTMENTS
-    )
+    assert "Engineering" in STANDARD_DEPARTMENTS
 
-    assert (
-        "Finance"
-        in STANDARD_DEPARTMENTS
-    )
+    assert "Finance" in STANDARD_DEPARTMENTS
 
 
 def test_department_mapping_values_are_standard():
@@ -177,5 +155,3 @@ def test_project_directories_exist():
     assert RAW_DATA_DIR.name == "raw"
 
     assert OUTPUT_DIR.name == "outputs"
-    
-    

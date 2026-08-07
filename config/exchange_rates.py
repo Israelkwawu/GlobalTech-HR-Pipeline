@@ -36,6 +36,4 @@ EXCHANGE_RATES = {
 # Supported Currencies
 # ============================================================================
 
-SUPPORTED_CURRENCIES = tuple(
-    EXCHANGE_RATES.keys()
-)
+SUPPORTED_CURRENCIES = tuple(EXCHANGE_RATES.keys())

@@ -15,7 +15,6 @@ class RangeValidator(BaseValidator):
 
     name = "range_check"
 
-
     def __init__(
         self,
         column: str,
@@ -26,7 +25,6 @@ class RangeValidator(BaseValidator):
         self.minimum = minimum
         self.maximum = maximum
 
-
     def validate(
         self,
         df: pd.DataFrame,
@@ -34,22 +32,16 @@ class RangeValidator(BaseValidator):
 
         errors = []
 
-
         if self.column not in df.columns:
 
             return pd.DataFrame(errors)
 
-
         for _, row in df.iterrows():
 
-            value = row.get(
-                self.column
-            )
-
+            value = row.get(self.column)
 
             if pd.isna(value):
                 continue
-
 
             try:
 
@@ -68,44 +60,26 @@ class RangeValidator(BaseValidator):
 
                 continue
 
-
-            if (
-                self.minimum is not None
-                and value < self.minimum
-            ):
+            if self.minimum is not None and value < self.minimum:
 
                 errors.append(
                     self.error(
                         row,
                         "BELOW_MINIMUM",
-                        (
-                            f"{self.column} "
-                            f"below minimum "
-                            f"{self.minimum}"
-                        ),
+                        (f"{self.column} " f"below minimum " f"{self.minimum}"),
                         self.column,
                     )
                 )
 
-
-            if (
-                self.maximum is not None
-                and value > self.maximum
-            ):
+            if self.maximum is not None and value > self.maximum:
 
                 errors.append(
                     self.error(
                         row,
                         "ABOVE_MAXIMUM",
-                        (
-                            f"{self.column} "
-                            f"above maximum "
-                            f"{self.maximum}"
-                        ),
+                        (f"{self.column} " f"above maximum " f"{self.maximum}"),
                         self.column,
                     )
                 )
 
-
         return pd.DataFrame(errors)
-    

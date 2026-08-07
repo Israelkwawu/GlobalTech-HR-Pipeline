@@ -51,17 +51,11 @@ def normalize_email_column(
     df = df.copy()
 
     if column not in df.columns:
-        raise KeyError(
-            f"Missing '{column}' column."
-        )
+        raise KeyError(f"Missing '{column}' column.")
 
-    logger.info(
-        "Normalizing email column..."
-    )
+    logger.info("Normalizing email column...")
 
-    df[column] = df[column].apply(
-        normalize_email
-    )
+    df[column] = df[column].apply(normalize_email)
 
     return df
 
@@ -92,18 +86,12 @@ def email_match(
     """
 
     if email_column not in left.columns:
-        raise KeyError(
-            f"Missing '{email_column}' in left DataFrame."
-        )
+        raise KeyError(f"Missing '{email_column}' in left DataFrame.")
 
     if email_column not in right.columns:
-        raise KeyError(
-            f"Missing '{email_column}' in right DataFrame."
-        )
+        raise KeyError(f"Missing '{email_column}' in right DataFrame.")
 
-    logger.info(
-        "Running email matching..."
-    )
+    logger.info("Running email matching...")
 
     left = normalize_email_column(
         left,
@@ -155,11 +143,7 @@ def unmatched_emails(
         email_column,
     )
 
-    unmatched = left[
-        ~left[email_column].isin(
-            right[email_column]
-        )
-    ].copy()
+    unmatched = left[~left[email_column].isin(right[email_column])].copy()
 
     logger.info(
         "Unmatched emails: %s",
@@ -187,9 +171,7 @@ def duplicate_emails(
             subset=email_column,
             keep=False,
         )
-    ].sort_values(
-        email_column
-    )
+    ].sort_values(email_column)
 
     logger.info(
         "Duplicate emails found: %s",
@@ -217,4 +199,3 @@ def validate_unique_emails(
         subset=email_column,
         keep=False,
     )
-    

@@ -67,22 +67,14 @@ class ReferentialValidator(BaseValidator):
 
             return pd.DataFrame(errors)
 
-        valid_values = set(
-            df[self.reference_column]
-            .dropna()
-            .astype(str)
-            .str.strip()
-        )
+        valid_values = set(df[self.reference_column].dropna().astype(str).str.strip())
 
         for _, row in df.iterrows():
 
             value = row[self.source_column]
 
             # CEOs / top-level employees are allowed
-            if (
-                pd.isna(value)
-                or str(value).strip() == ""
-            ):
+            if pd.isna(value) or str(value).strip() == "":
                 continue
 
             if str(value).strip() not in valid_values:
@@ -91,13 +83,9 @@ class ReferentialValidator(BaseValidator):
                     self.error(
                         row=row,
                         rule="INVALID_REFERENCE",
-                        message=(
-                            f"{self.source_column} '{value}' "
-                            "does not exist."
-                        ),
+                        message=(f"{self.source_column} '{value}' " "does not exist."),
                         column=self.source_column,
                     )
                 )
 
         return pd.DataFrame(errors)
-    

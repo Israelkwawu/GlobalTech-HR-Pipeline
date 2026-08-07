@@ -22,7 +22,6 @@ from pathlib import Path
 from config.settings import LOG_DIR, LOG_FILE, LOG_LEVEL
 from config.constants import LOG_FORMAT
 
-
 # ============================================================================
 # Logging Constants
 # ============================================================================
@@ -33,6 +32,7 @@ LOG_FILE_NAME = "pipeline.log"
 # ============================================================================
 # Create Log Directory
 # ============================================================================
+
 
 def create_log_directory() -> None:
     """
@@ -48,6 +48,7 @@ def create_log_directory() -> None:
 # ============================================================================
 # Logging Configuration
 # ============================================================================
+
 
 def configure_logging(
     level: str | None = None,
@@ -68,9 +69,7 @@ def configure_logging(
 
     create_log_directory()
 
-    log_level = (
-        level or LOG_LEVEL
-    ).upper()
+    log_level = (level or LOG_LEVEL).upper()
 
     numeric_level = getattr(
         logging,
@@ -78,25 +77,17 @@ def configure_logging(
         logging.INFO,
     )
 
-    formatter = logging.Formatter(
-        LOG_FORMAT
-    )
+    formatter = logging.Formatter(LOG_FORMAT)
 
     # ------------------------------------------------------------------------
     # Console Handler
     # ------------------------------------------------------------------------
 
-    console_handler = logging.StreamHandler(
-        sys.stdout
-    )
+    console_handler = logging.StreamHandler(sys.stdout)
 
-    console_handler.setLevel(
-        numeric_level
-    )
+    console_handler.setLevel(numeric_level)
 
-    console_handler.setFormatter(
-        formatter
-    )
+    console_handler.setFormatter(formatter)
 
     # ------------------------------------------------------------------------
     # File Handler
@@ -107,13 +98,9 @@ def configure_logging(
         encoding="utf-8",
     )
 
-    file_handler.setLevel(
-        numeric_level
-    )
+    file_handler.setLevel(numeric_level)
 
-    file_handler.setFormatter(
-        formatter
-    )
+    file_handler.setFormatter(formatter)
 
     # ------------------------------------------------------------------------
     # Root Logger
@@ -121,25 +108,20 @@ def configure_logging(
 
     root_logger = logging.getLogger()
 
-    root_logger.setLevel(
-        numeric_level
-    )
+    root_logger.setLevel(numeric_level)
 
     # Prevent duplicate handlers
     if not root_logger.handlers:
 
-        root_logger.addHandler(
-            console_handler
-        )
+        root_logger.addHandler(console_handler)
 
-        root_logger.addHandler(
-            file_handler
-        )
+        root_logger.addHandler(file_handler)
 
 
 # ============================================================================
 # Logger Factory
 # ============================================================================
+
 
 def get_logger(
     name: str,

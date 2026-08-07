@@ -35,7 +35,6 @@ class BaseValidator(ABC):
         """
         pass
 
-
     def error(
         self,
         row,
@@ -48,16 +47,9 @@ class BaseValidator(ABC):
         """
 
         return {
-            "employee_id": row.get(
-                "employee_id"
-            ),
+            "employee_id": row.get("employee_id"),
             "rule": rule,
             "column": column,
-            "value": (
-                row.get(column)
-                if column
-                else None
-            ),
+            "value": (row.get(column) if column else None),
             "message": message,
         }
-        

@@ -12,7 +12,6 @@ import pandas as pd
 
 from config.logging_config import get_logger
 
-
 logger = get_logger(__name__)
 
 
@@ -41,20 +40,13 @@ def exact_employee_match(
         Matched employee pairs.
     """
 
-    logger.info(
-        "Running exact employee ID matching..."
-    )
+    logger.info("Running exact employee ID matching...")
 
     if id_column not in left.columns:
-        raise KeyError(
-            f"Missing {id_column}"
-        )
+        raise KeyError(f"Missing {id_column}")
 
     if id_column not in right.columns:
-        raise KeyError(
-            f"Missing {id_column}"
-        )
-
+        raise KeyError(f"Missing {id_column}")
 
     matches = left.merge(
         right,
@@ -66,10 +58,7 @@ def exact_employee_match(
         ),
     )
 
-
-    matches["match_method"] = (
-        "exact_id"
-    )
+    matches["match_method"] = "exact_id"
 
     logger.info(
         "Exact matches found: %s",

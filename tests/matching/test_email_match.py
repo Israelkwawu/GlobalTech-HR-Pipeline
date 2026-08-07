@@ -13,10 +13,7 @@ from src.matching.email_match import (
 
 def test_normalize_email():
 
-    assert (
-        normalize_email(" John.Smith@Example.com ")
-        == "john.smith@example.com"
-    )
+    assert normalize_email(" John.Smith@Example.com ") == "john.smith@example.com"
 
 
 def test_normalize_email_none():
@@ -59,10 +56,7 @@ def test_email_match():
 
     assert len(result) == 1
 
-    assert (
-        result.iloc[0]["match_method"]
-        == "email_match"
-    )
+    assert result.iloc[0]["match_method"] == "email_match"
 
 
 def test_unmatched_emails():
@@ -91,10 +85,7 @@ def test_unmatched_emails():
 
     assert len(result) == 1
 
-    assert (
-        result.iloc[0]["email"]
-        == "b@test.com"
-    )
+    assert result.iloc[0]["email"] == "b@test.com"
 
 
 def test_duplicate_emails():
@@ -145,4 +136,3 @@ def test_missing_email_column():
 
     with pytest.raises(KeyError):
         normalize_email_column(df)
-        

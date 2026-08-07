@@ -73,37 +73,27 @@ def test_no_digits():
 
 def test_valid_employee_id():
 
-    assert is_valid_employee_id(
-        "GT-001234"
-    )
+    assert is_valid_employee_id("GT-001234")
 
 
 def test_valid_acquiredco_id():
 
-    assert is_valid_employee_id(
-        "AC-999999"
-    )
+    assert is_valid_employee_id("AC-999999")
 
 
 def test_invalid_employee_id():
 
-    assert not is_valid_employee_id(
-        "GT123"
-    )
+    assert not is_valid_employee_id("GT123")
 
 
 def test_invalid_prefix():
 
-    assert not is_valid_employee_id(
-        "HR-000123"
-    )
+    assert not is_valid_employee_id("HR-000123")
 
 
 def test_none_is_invalid():
 
-    assert not is_valid_employee_id(
-        None
-    )
+    assert not is_valid_employee_id(None)
 
 
 def test_dataframe_namespace():
@@ -123,24 +113,14 @@ def test_dataframe_namespace():
 
     result = namespace_employee_ids(df)
 
-    assert (
-        result.loc[0, "employee_id"]
-        == "GT-000001"
-    )
+    assert result.loc[0, "employee_id"] == "GT-000001"
 
-    assert (
-        result.loc[1, "employee_id"]
-        == "AC-000100"
-    )
+    assert result.loc[1, "employee_id"] == "AC-000100"
 
 
 def test_dataframe_missing_company():
 
-    df = pd.DataFrame(
-        {
-            "employee_id": [1]
-        }
-    )
+    df = pd.DataFrame({"employee_id": [1]})
 
     with pytest.raises(KeyError):
         namespace_employee_ids(df)
@@ -172,13 +152,10 @@ def test_returns_copy():
     df = pd.DataFrame(
         {
             "employee_id": [1],
-            "company_origin": [
-                "GlobalTech"
-            ],
+            "company_origin": ["GlobalTech"],
         }
     )
 
     result = namespace_employee_ids(df)
 
     assert result is not df
-    

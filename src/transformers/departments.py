@@ -30,24 +30,29 @@ logger = get_logger(__name__)
 def normalize_department(
     department: str | None,
 ) -> str | None:
-    """
-    Normalize department values.
-
-    Examples
-    --------
-    engineering -> Engineering
-
-    FINANCE -> Finance
-    """
 
     if pd.isna(department):
         return None
 
-    return (
-        str(department)
-        .strip()
-        .title()
-    )
+    value = str(department).strip()
+
+    # preserve codes
+    if "-" in value:
+        return value.upper()
+
+    # preserve known acronyms
+    special = {
+        "it": "Information Technology",
+        "hr": "Human Resources",
+        "devops": "DevOps",
+    }
+
+    lower = value.lower()
+
+    if lower in special:
+        return special[lower]
+
+    return value.title()
 
 
 def map_department(
@@ -58,9 +63,7 @@ def map_department(
     Map one department into the standard taxonomy.
     """
 
-    department = normalize_department(
-        department
-    )
+    department = normalize_department(department)
 
     if department is None:
         return None
@@ -74,9 +77,7 @@ def map_department(
         mapping = ACQUIREDCO_DEPARTMENT_MAP
 
     else:
-        raise ValueError(
-            f"Unsupported company: {company}"
-        )
+        raise ValueError(f"Unsupported company: {company}")
 
     result = mapping.get(department)
 
@@ -110,20 +111,15 @@ def map_departments(
     missing = required - set(df.columns)
 
     if missing:
-        raise KeyError(
-            f"Missing columns: {missing}"
-        )
+        raise KeyError(f"Missing columns: {missing}")
 
-    logger.info(
-        "Mapping departments..."
-    )
+    logger.info("Mapping departments...")
 
     df[department_column] = df.apply(
-        lambda row:
-            map_department(
-                row[department_column],
-                row[company_column],
-            ),
+        lambda row: map_department(
+            row[department_column],
+            row[company_column],
+        ),
         axis=1,
     )
 
@@ -138,7 +134,4 @@ def find_unmapped_departments(
     Return rows whose department could not be mapped.
     """
 
-    return df[
-        df[department_column].isna()
-    ]
-    
+    return df[df[department_column].isna()]

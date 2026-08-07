@@ -16,40 +16,45 @@ from src.transformers.departments import (
 
 def test_normalize_department():
 
-    assert normalize_department(
-        " engineering "
-    ) == "Engineering"
+    assert normalize_department(" engineering ") == "Engineering"
 
 
 def test_normalize_department_none():
 
-    assert normalize_department(
-        None
-    ) is None
+    assert normalize_department(None) is None
 
 
 def test_map_department_globaltech():
 
-    assert map_department(
-        "Engineering",
-        GLOBALTECH,
-    ) == "Engineering"
+    assert (
+        map_department(
+            "Engineering",
+            GLOBALTECH,
+        )
+        == "Engineering"
+    )
 
 
 def test_map_department_acquiredco():
 
-    assert map_department(
-        "Product",
-        ACQUIREDCO,
-    ) == "Product"
+    assert (
+        map_department(
+            "Product",
+            ACQUIREDCO,
+        )
+        == "Product"
+    )
 
 
 def test_unknown_department_returns_none():
 
-    assert map_department(
-        "Alien Department",
-        GLOBALTECH,
-    ) is None
+    assert (
+        map_department(
+            "Alien Department",
+            GLOBALTECH,
+        )
+        is None
+    )
 
 
 def test_invalid_company():
@@ -115,4 +120,3 @@ def test_find_unmapped_departments():
     result = find_unmapped_departments(df)
 
     assert len(result) == 2
-    

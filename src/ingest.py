@@ -30,7 +30,7 @@ from src.utils.helpers import (
     standardize_missing_values,
     log_dataframe_schema,
     add_missing_columns,
-    reorder_columns
+    reorder_columns,
 )
 
 from src.models.employee_schema import (
@@ -42,6 +42,7 @@ from src.models.employee_schema import (
 from src.utils.dead_letter import write_dead_letter
 
 logger = get_logger(__name__)
+
 
 def load_globaltech_hris(
     file_path: str | Path | None = None,
@@ -121,7 +122,7 @@ def load_globaltech_hris(
             path=file_path,
             records=len(df),
         )
-        
+
         log_dataframe_schema(source_name, df)
 
         log_dataframe_summary(
@@ -138,7 +139,7 @@ def load_globaltech_hris(
             file_path,
             exc,
         )
-        
+
         write_dead_letter(
             source_system=source_name,
             file_name=Path(file_path).name,
@@ -177,9 +178,7 @@ def load_globaltech_hris(
             error=exc,
         )
 
-        raise RuntimeError(
-            "GlobalTech HRIS file is empty."
-        ) from exc
+        raise RuntimeError("GlobalTech HRIS file is empty.") from exc
 
     except ParserError as exc:
 
@@ -195,9 +194,7 @@ def load_globaltech_hris(
             error=exc,
         )
 
-        raise RuntimeError(
-            "Unable to parse GlobalTech HRIS CSV."
-        ) from exc
+        raise RuntimeError("Unable to parse GlobalTech HRIS CSV.") from exc
 
     except Exception as exc:
 
@@ -206,17 +203,14 @@ def load_globaltech_hris(
             file_path,
             exc,
         )
-        
+
         write_dead_letter(
             source_system=source_name,
             file_name=Path(file_path).name,
             error=exc,
         )
 
-        raise RuntimeError(
-            "Unexpected error while loading GlobalTech HRIS."
-        ) from exc
-        
+        raise RuntimeError("Unexpected error while loading GlobalTech HRIS.") from exc
 
 
 def load_acquiredco_hris(
@@ -300,18 +294,14 @@ def load_acquiredco_hris(
             if "employees" in data:
                 records = data["employees"]
             else:
-                raise RuntimeError(
-                    "JSON does not contain an 'employees' key."
-                )
+                raise RuntimeError("JSON does not contain an 'employees' key.")
 
         elif isinstance(data, list):
 
             records = data
 
         else:
-            raise RuntimeError(
-                "Unsupported JSON structure."
-            )
+            raise RuntimeError("Unsupported JSON structure.")
 
         # ------------------------------------------------------------------
         # Simulate API Pagination
@@ -385,7 +375,7 @@ def load_acquiredco_hris(
             file_path,
             exc,
         )
-        
+
         write_dead_letter(
             source_system=source_name,
             file_name=Path(file_path).name,
@@ -393,7 +383,7 @@ def load_acquiredco_hris(
         )
 
         raise
-    
+
     except json.JSONDecodeError as exc:
 
         log_file_error(
@@ -408,10 +398,8 @@ def load_acquiredco_hris(
             error=exc,
         )
 
-        raise RuntimeError(
-            "Malformed JSON file."
-        ) from exc
-        
+        raise RuntimeError("Malformed JSON file.") from exc
+
     except ValueError as exc:
 
         log_file_error(
@@ -435,18 +423,16 @@ def load_acquiredco_hris(
             file_path,
             exc,
         )
-        
+
         write_dead_letter(
             source_system=source_name,
             file_name=Path(file_path).name,
             error=exc,
         )
 
-        raise RuntimeError(
-            "Unexpected error while loading AcquiredCo HRIS."
-        ) from exc
-       
-    
+        raise RuntimeError("Unexpected error while loading AcquiredCo HRIS.") from exc
+
+
 def load_benefits(
     file_path: str | Path | None = None,
 ) -> pd.DataFrame:
@@ -498,13 +484,7 @@ def load_benefits(
         tree = ET.parse(file_path)
         root = tree.getroot()
 
-        records = [
-            {
-                child.tag: child.text
-                for child in node
-            }
-            for node in root
-        ]
+        records = [{child.tag: child.text for child in node} for node in root]
 
         df = pd.DataFrame(records)
 
@@ -515,6 +495,18 @@ def load_benefits(
         df = normalize_column_names(df)
 
         df = standardize_missing_values(df)
+
+        for column in [
+            "premium_employee",
+            "premium_employer",
+        ]:
+
+            if column in df.columns:
+
+                df[column] = pd.to_numeric(
+                    df[column],
+                    errors="coerce",
+                )
 
         df = add_source_system(
             df,
@@ -530,7 +522,7 @@ def load_benefits(
             path=file_path,
             records=len(df),
         )
-        
+
         log_dataframe_schema(source_name, df)
 
         log_dataframe_summary(
@@ -547,7 +539,7 @@ def load_benefits(
             file_path,
             exc,
         )
-        
+
         write_dead_letter(
             source_system=source_name,
             file_name=Path(file_path).name,
@@ -555,7 +547,7 @@ def load_benefits(
         )
 
         raise
-    
+
     except ET.ParseError as exc:
 
         log_file_error(
@@ -564,10 +556,8 @@ def load_benefits(
             exc,
         )
 
-        raise RuntimeError(
-            "Malformed Benefits XML."
-        ) from exc
-        
+        raise RuntimeError("Malformed Benefits XML.") from exc
+
     except ValueError as exc:
 
         log_file_error(
@@ -583,7 +573,7 @@ def load_benefits(
         )
 
         raise
-    
+
     except Exception as exc:
 
         log_file_error(
@@ -591,69 +581,60 @@ def load_benefits(
             file_path,
             exc,
         )
-        
+
         write_dead_letter(
             source_system=source_name,
             file_name=Path(file_path).name,
             error=exc,
         )
 
-        raise RuntimeError(
-            "Unexpected error while loading Benefits."
-        ) from exc
-        
-        
+        raise RuntimeError("Unexpected error while loading Benefits.") from exc
+
+
 def load_payroll(
     file_path: str | Path | None = None,
     sheet_name: str | int = 0,
 ) -> pd.DataFrame:
     """
-    Load the ADP Payroll Excel export.
+    Load ADP Payroll Excel export.
 
-    Parameters
-    ----------
-    file_path : str | Path, optional
-        Path to the payroll Excel file.
-
-    sheet_name : str | int, default=0
-        Worksheet name or index.
-
-    Returns
-    -------
-    pd.DataFrame
-        Payroll data.
-
-    Raises
-    ------
-    FileNotFoundError
-        If the file does not exist.
-
-    RuntimeError
-        If the workbook cannot be read.
+    Responsibilities
+    ----------------
+    - Validate payroll source
+    - Load Excel
+    - Normalize columns
+    - Preserve company origin
+    - Normalize employee IDs
+    - Prepare payroll enrichment source
     """
 
     source_name = "payroll"
 
     if file_path is None:
+
         file_path = RAW_DATA_DIR / "payroll_data.xlsx"
 
     try:
 
-        # ------------------------------------------------------------------
+        # ==================================================
         # Validate file
-        # ------------------------------------------------------------------
+        # ==================================================
 
         validate_file_exists(file_path)
-        validate_extension(file_path, [".xlsx"])
+
+        validate_extension(
+            file_path,
+            [".xlsx"],
+        )
 
         logger.info(
-            "Loading Payroll from %s",
+            "Loading payroll file=%s",
             file_path,
         )
 
-        # ------------------------------------------------------------------
+        # ==================================================
         # Read Excel
-        # ------------------------------------------------------------------
+        # ==================================================
 
         df = pd.read_excel(
             file_path,
@@ -661,37 +642,224 @@ def load_payroll(
             engine="openpyxl",
         )
 
-        # ------------------------------------------------------------------
-        # Standardize
-        # ------------------------------------------------------------------
+        logger.info(
+            """
+========== RAW PAYROLL ==========
+Rows:
+%s
+
+Columns:
+%s
+=================================
+""",
+            len(df),
+            list(df.columns),
+        )
+
+        # ==================================================
+        # Normalize columns
+        # ==================================================
 
         df = normalize_column_names(df)
 
         df = standardize_missing_values(df)
+
+        # ==================================================
+        # Salary column normalization
+        # ==================================================
+
+        if "base_salary" in df.columns:
+
+            logger.info("Renaming base_salary -> salary")
+
+            df["salary"] = df["base_salary"]
+
+        # ==================================================
+        # Company origin handling
+        # ==================================================
+
+        if "company_origin" not in df.columns:
+
+            possible_company_columns = [
+                "source",
+                "company",
+                "organization",
+                "business_unit",
+            ]
+
+            found_company = False
+
+            for column in possible_company_columns:
+
+                if column in df.columns:
+
+                    logger.info(
+                        "Using %s as company_origin",
+                        column,
+                    )
+
+                    df["company_origin"] = df[column].astype(str).str.strip()
+
+                    found_company = True
+
+                    break
+
+            if not found_company:
+
+                logger.warning("""
+Payroll file has no company information.
+
+Defaulting company_origin=GlobalTech.
+
+If AcquiredCo payroll exists,
+provide company_origin column.
+""")
+
+                df["company_origin"] = "GlobalTech"
+
+        # ==================================================
+        # Normalize company names
+        # ==================================================
+
+        df["company_origin"] = df["company_origin"].replace(
+            {
+                "globaltech": "GlobalTech",
+                "Global Tech": "GlobalTech",
+                "GLOBALTECH": "GlobalTech",
+                "acquiredco": "AcquiredCo",
+                "Acquired Co": "AcquiredCo",
+                "ACQUIREDCO": "AcquiredCo",
+            }
+        )
+
+        # ==================================================
+        # Add provenance
+        # ==================================================
 
         df = add_source_system(
             df,
             source_name,
         )
 
-        # ------------------------------------------------------------------
-        # Logging
-        # ------------------------------------------------------------------
+        # ==================================================
+        # Employee ID detection
+        # ==================================================
 
-        duplicate_count = int(df.duplicated().sum())
+        if "employee_id" not in df.columns:
+
+            possible_ids = [
+                "employee_number",
+                "employee_no",
+                "emp_id",
+                "id",
+            ]
+
+            for column in possible_ids:
+
+                if column in df.columns:
+
+                    df.rename(
+                        columns={column: "employee_id"},
+                        inplace=True,
+                    )
+
+                    logger.info(
+                        "Mapped %s -> employee_id",
+                        column,
+                    )
+
+                    break
+
+        if "employee_id" not in df.columns:
+
+            raise ValueError("""
+Payroll file missing employee_id column
+""")
+
+        # ==================================================
+        # Normalize IDs
+        # ==================================================
+
+        df["employee_id"] = df["employee_id"].astype(str).str.strip()
+
+        # ==================================================
+        # Duplicate diagnostics
+        # ==================================================
+
+        duplicate_ids = df.duplicated(
+            subset=[
+                "employee_id",
+                "company_origin",
+            ],
+            keep=False,
+        ).sum()
 
         logger.info(
-            "Payroll duplicate records detected: %s",
-            duplicate_count,
+            """
+========== PAYROLL SUMMARY ==========
+
+Rows:
+%s
+
+Unique employees:
+%s
+
+Duplicate IDs:
+%s
+
+
+Company distribution:
+
+%s
+
+=====================================
+""",
+            len(df),
+            df["employee_id"].nunique(),
+            duplicate_ids,
+            df["company_origin"].value_counts().to_string(),
         )
+
+        # ==================================================
+        # Salary diagnostics
+        # ==================================================
+
+        salary_columns = [
+            c
+            for c in [
+                "employee_id",
+                "company_origin",
+                "salary",
+                "currency",
+                "pay_frequency",
+            ]
+            if c in df.columns
+        ]
+
+        logger.info(
+            """
+PAYROLL SAMPLE
+
+%s
+
+""",
+            df[salary_columns].head(10).to_string(),
+        )
+
+        # ==================================================
+        # Logging
+        # ==================================================
 
         log_file_loaded(
             source=source_name,
             path=file_path,
             records=len(df),
         )
-        
-        log_dataframe_schema(source_name, df)
+
+        log_dataframe_schema(
+            source_name,
+            df,
+        )
 
         log_dataframe_summary(
             "Payroll",
@@ -715,7 +883,7 @@ def load_payroll(
         )
 
         raise
-    
+
     except ValueError as exc:
 
         log_file_error(
@@ -731,7 +899,7 @@ def load_payroll(
         )
 
         raise
-    
+
     except Exception as exc:
 
         log_file_error(
@@ -746,34 +914,21 @@ def load_payroll(
             error=exc,
         )
 
-        raise RuntimeError(
-            "Unexpected error while loading Payroll."
-        ) from exc
-        
+        raise RuntimeError("Unexpected error while loading Payroll") from exc
+
 
 def align_employee_schema(
     df: pd.DataFrame,
     source_system: str,
 ) -> pd.DataFrame:
     """
-    Align a source DataFrame to the canonical employee schema.
+    Align source systems into canonical employee schema.
 
-    Parameters
-    ----------
-    df : pd.DataFrame
-        Raw source DataFrame.
-
-    source_system : str
-        One of:
-        - globaltech_hris
-        - acquiredco_hris
-        - payroll
-        - benefits
-
-    Returns
-    -------
-    pd.DataFrame
-        DataFrame aligned to the canonical employee schema.
+    Supported sources:
+    - globaltech_hris
+    - acquiredco_hris
+    - payroll
+    - benefits
     """
 
     logger.info(
@@ -782,10 +937,9 @@ def align_employee_schema(
     )
 
     mappings = {
-
-        # --------------------------------------------------------------
+        # ============================================================
         # GlobalTech HRIS
-        # --------------------------------------------------------------
+        # ============================================================
         "globaltech_hris": {
             "employee_id": "employee_id",
             "first_name": "first_name",
@@ -798,101 +952,91 @@ def align_employee_schema(
             "employment_type": "employment_type",
             "manager_id": "manager_id",
         },
-
-        # --------------------------------------------------------------
-        # AcquiredCo
-        # --------------------------------------------------------------
+        # ============================================================
+        # AcquiredCo HRIS
+        # JSON flattened by pd.json_normalize()
+        #
+        # Example:
+        #
+        # name.first
+        # assignment.department
+        #
+        # ============================================================
         "acquiredco_hris": {
             "employee_identifier": "employee_id",
-            "first": "first_name",
-            "last": "last_name",
-            "email": "email",
-            "department": "department",
-            "role": "job_title",
-            "location": "country",
-            "hire_timestamp": "hire_date",
-            "type": "employment_type",
+            "name.first": "first_name",
+            "name.last": "last_name",
+            "name.full": "full_name",
+            "contact.email": "email",
+            "assignment.department": "department",
+            "assignment.role": "job_title",
+            "assignment.location": "country",
+            "assignment.hire_timestamp": "hire_date",
+            "employment.type": "employment_type",
             "manager_employee_id": "manager_id",
         },
-
-        # --------------------------------------------------------------
+        # ============================================================
         # Payroll
-        # --------------------------------------------------------------
+        # ============================================================
         "payroll": {
             "employee_id": "employee_id",
+            "source": "company_origin",
             "base_salary": "salary",
             "currency": "currency",
             "pay_frequency": "pay_frequency",
+            "bonus_target_pct": "bonus_target_pct",
+            "effective_date": "effective_date",
         },
-
-        # --------------------------------------------------------------
+        # ============================================================
         # Benefits
-        # --------------------------------------------------------------
+        # ============================================================
         "benefits": {
             "employee_id": "employee_id",
-            "plan_type": "benefit_plan",
+            "plan_type": "plan_type",
             "coverage_level": "coverage_level",
             "enrollment_date": "benefits_enrollment_date",
+            "premium_employee": "premium_employee",
+            "premium_employer": "premium_employer",
         },
     }
 
     if source_system not in mappings:
-        raise ValueError(
-            f"Unsupported source: {source_system}"
-        )
+
+        raise ValueError(f"Unsupported source {source_system}")
 
     mapping = mappings[source_system]
 
-    # Keep only mapped columns
-    available = {
-        src: dst
-        for src, dst in mapping.items()
-        if src in df.columns
+    available_columns = {
+        source: target for source, target in mapping.items() if source in df.columns
     }
 
     aligned = (
-        df[list(available.keys())]
-        .rename(columns=available)
-        .copy()
+        df[list(available_columns.keys())].rename(columns=available_columns).copy()
     )
 
-    # Preserve provenance
     aligned["source_system"] = source_system
 
-    # Add missing canonical columns
+    aligned["company_origin"] = {
+        "globaltech_hris": "GlobalTech",
+        "acquiredco_hris": "AcquiredCo",
+        "payroll": "Payroll",
+        "benefits": "Benefits",
+    }.get(source_system, "Unknown")
+
     aligned = add_missing_columns(
         aligned,
         EMPLOYEE_COLUMNS,
     )
 
-    # Reorder columns
     aligned = reorder_columns(
         aligned,
         EMPLOYEE_COLUMNS,
     )
 
-    # Apply configured dtypes
-    for column, dtype in EMPLOYEE_DTYPES.items():
-
-        if column not in aligned.columns:
-            continue
-
-        try:
-            aligned[column] = aligned[column].astype(dtype)
-
-        except Exception:
-
-            logger.warning(
-                "Unable to cast '%s' to %s",
-                column,
-                dtype,
-            )
-
     logger.info(
-        "%s successfully aligned (%s rows)",
+        "%s aligned successfully (%s rows)",
         source_system,
         len(aligned),
     )
 
     return aligned
-

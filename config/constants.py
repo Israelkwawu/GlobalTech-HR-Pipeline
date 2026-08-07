@@ -17,6 +17,8 @@ import re
 PIPELINE_NAME = "GlobalTech HR Data Integration Pipeline"
 PIPELINE_VERSION = "1.0.0"
 
+MAX_VALIDATION_FAILURES = 2
+
 # ============================================================================
 # Company Names
 # ============================================================================
@@ -174,8 +176,8 @@ MAX_FAILED_VALIDATION_CHECKS = 2
 # ============================================================================
 
 # GlobalTech HRIS CSV
-# Example: 21/09/2016
-DATE_FORMAT_GLOBALTECH = "%d/%m/%Y"
+# Example: 2016-09-21
+DATE_FORMAT_GLOBALTECH = "%Y-%m-%d"
 
 # AcquiredCo JSON API
 # Example: 2024-06-27T00:00:00
@@ -217,16 +219,12 @@ HTML = ".html"
 # Regular Expressions
 # ============================================================================
 
-EMAIL_REGEX = (
-    r"^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$"
-)
+EMAIL_REGEX = r"^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$"
 
 GLOBALTECH_EMPLOYEE_ID_REGEX = r"^GT-\d{6}$"
 ACQUIREDCO_EMPLOYEE_ID_REGEX = r"^AC-\d{6}$"
 
-EMPLOYEE_ID_REGEX = (
-    r"^(GT|AC)-\d{6}$"
-)
+EMPLOYEE_ID_REGEX = r"^(GT|AC)-\d{6}$"
 
 # ============================================================================
 # Employee ID Configuration
@@ -237,17 +235,13 @@ COMPANY_ID_PREFIXES = {
     ACQUIREDCO: ACQUIREDCO_ID_PREFIX,
 }
 
-EMPLOYEE_ID_PATTERN = re.compile(
-    EMPLOYEE_ID_REGEX
-)
+EMPLOYEE_ID_PATTERN = re.compile(EMPLOYEE_ID_REGEX)
 
 # ============================================================================
 # Logging
 # ============================================================================
 
-LOG_FORMAT = (
-    "%(asctime)s | %(levelname)s | %(name)s | %(message)s"
-)
+LOG_FORMAT = "%(asctime)s | %(levelname)s | %(name)s | %(message)s"
 
 DEFAULT_LOG_LEVEL = "INFO"
 

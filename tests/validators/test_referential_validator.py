@@ -128,4 +128,3 @@ def test_missing_reference_column():
 
     assert len(result) == 1
     assert result.iloc[0]["rule"] == "MISSING_COLUMN"
-    

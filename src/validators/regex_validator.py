@@ -23,7 +23,6 @@ class RegexValidator(BaseValidator):
 
     name = "regex_check"
 
-
     def __init__(
         self,
         rules: dict[str, str],
@@ -44,7 +43,6 @@ class RegexValidator(BaseValidator):
 
         self.rules = rules
 
-
     def validate(
         self,
         df: pd.DataFrame,
@@ -59,14 +57,11 @@ class RegexValidator(BaseValidator):
                 if column not in df.columns:
                     continue
 
-
                 value = row.get(column)
-
 
                 if pd.isna(value):
 
                     continue
-
 
                 if not re.fullmatch(
                     pattern,
@@ -82,6 +77,4 @@ class RegexValidator(BaseValidator):
                         )
                     )
 
-
         return pd.DataFrame(errors)
-    
