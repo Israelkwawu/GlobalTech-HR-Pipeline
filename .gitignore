@@ -222,3 +222,4 @@ __marimo__/
 ~$*.xls
 
 data/dead_letter/*
+outputs/*

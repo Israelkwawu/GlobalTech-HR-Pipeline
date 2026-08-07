@@ -27,7 +27,7 @@ REQUIRED_FIELDS = [
     "email",
     "department",
     "job_title",
-    "hire_date",
+    # "hire_date",
     "country",
     "employment_type",
 ]

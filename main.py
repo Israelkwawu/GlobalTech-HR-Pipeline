@@ -21,13 +21,9 @@ import sys
 from pathlib import Path
 
 
-from config.logging_config import (
-    configure_logging,
-    get_logger
-)
+from config.logging_config import configure_logging, get_logger
 
 from src.pipeline import run_pipeline
-
 
 configure_logging()
 logger = get_logger(__name__)
@@ -37,25 +33,21 @@ logger = get_logger(__name__)
 # CLI Arguments
 # ============================================================
 
+
 def create_parser() -> argparse.ArgumentParser:
     """
     Create CLI argument parser.
     """
 
     parser = argparse.ArgumentParser(
-        description=(
-            "GlobalTech HR Data Integration Pipeline"
-        )
+        description=("GlobalTech HR Data Integration Pipeline")
     )
 
     parser.add_argument(
         "--output",
         "-o",
         default="outputs",
-        help=(
-            "Output directory "
-            "(default: outputs)"
-        ),
+        help=("Output directory " "(default: outputs)"),
     )
 
     return parser
@@ -64,6 +56,7 @@ def create_parser() -> argparse.ArgumentParser:
 # ============================================================
 # Helpers
 # ============================================================
+
 
 def calculate_validation_score(
     summary: dict,
@@ -96,7 +89,6 @@ def calculate_validation_score(
     )
 
 
-
 def display_charts(
     charts,
 ):
@@ -108,7 +100,6 @@ def display_charts(
 
         return
 
-
     # Dictionary format
 
     if isinstance(
@@ -118,12 +109,9 @@ def display_charts(
 
         for name, path in charts.items():
 
-            print(
-                f" - {name}: {path}"
-            )
+            print(f" - {name}: {path}")
 
         return
-
 
     # List format
 
@@ -134,21 +122,17 @@ def display_charts(
 
         for chart in charts:
 
-            print(
-                f" - {chart}"
-            )
+            print(f" - {chart}")
 
         return
 
-
-    print(
-        f" - {charts}"
-    )
+    print(f" - {charts}")
 
 
 # ============================================================
 # Pipeline Runner
 # ============================================================
+
 
 def main() -> int:
     """
@@ -164,35 +148,23 @@ def main() -> int:
 
     args = parser.parse_args()
 
-
-    output_dir = Path(
-        args.output
-    )
-
+    output_dir = Path(args.output)
 
     try:
 
-        logger.info(
-            "Launching HR pipeline..."
-        )
+        logger.info("Launching HR pipeline...")
 
-
-        result = run_pipeline(
-            output_dir
-        )
-
+        result = run_pipeline(output_dir)
 
         validation = result.get(
             "validation",
             {},
         )
 
-
         summary = validation.get(
             "summary",
             {},
         )
-
 
         # ----------------------------------------------------
         # Backward compatible summary fields
@@ -203,46 +175,31 @@ def main() -> int:
             0,
         )
 
-
         validation_score = summary.get(
             "validation_score",
             calculate_validation_score(summary),
         )
-
 
         failed_records = summary.get(
             "failed_records",
             0,
         )
 
-
         pipeline_status = summary.get(
             "pipeline_passed",
             True,
         )
 
-
-        logger.info(
-            "Pipeline completed successfully"
-        )
-
+        logger.info("Pipeline completed successfully")
 
         export_result = result.get(
             "export",
             "No export information available",
         )
 
-
-        display_charts(
-            result.get(
-                "charts"
-            )
-        )
-
+        display_charts(result.get("charts"))
 
         return 0
-
-
 
     except Exception as exc:
 
@@ -251,9 +208,7 @@ def main() -> int:
             exc,
         )
 
-
         return 1
-
 
 
 # ============================================================
@@ -262,7 +217,4 @@ def main() -> int:
 
 if __name__ == "__main__":
 
-    sys.exit(
-        main()
-    )
-    
+    sys.exit(main())

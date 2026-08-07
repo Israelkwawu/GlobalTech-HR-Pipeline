@@ -257,3 +257,40 @@ def log_dataframe_schema(
 
     for column, dtype in df.dtypes.items():
         logger.info("  %-25s %s", column, dtype)
+
+
+def clean_date_columns(
+    df: pd.DataFrame,
+    columns: list[str],
+) -> pd.DataFrame:
+    """
+    Normalize date columns safely.
+
+    Invalid or missing dates become NaT.
+
+    Parameters
+    ----------
+    df:
+        Input dataframe
+
+    columns:
+        Date columns to normalize
+
+    Returns
+    -------
+    pd.DataFrame
+        Cleaned dataframe
+    """
+
+    df = df.copy()
+
+    for column in columns:
+
+        if column in df.columns:
+
+            df[column] = pd.to_datetime(
+                df[column],
+                errors="coerce",
+            )
+
+    return df

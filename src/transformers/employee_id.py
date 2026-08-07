@@ -8,6 +8,7 @@ Responsibilities
 - Validate employee ID format
 - Standardize employee identifiers
 - Apply namespaced IDs to DataFrames
+- Capture malformed IDs for review
 
 Author: Israel Kwawu
 """
@@ -44,15 +45,13 @@ def resolve_company_prefix(
     """
     Resolve company namespace.
 
-    Returns:
+    Examples:
 
         GlobalTech -> GT
         AcquiredCo -> AC
-
     """
 
     if company is None:
-
         return None
 
     company = str(company).strip().lower()
@@ -70,7 +69,7 @@ def resolve_company_prefix(
 
 
 # ============================================================
-# Safe Value Check
+# Safe Empty Check
 # ============================================================
 
 
@@ -103,27 +102,26 @@ def namespace_employee_id(
     """
     Convert employee ID into canonical format.
 
-
     Examples:
-
-        GlobalTech
 
         1
         ->
         GT-000001
 
-
-        AcquiredCo
-
-        ACQ_24
-
+        EMP-123
         ->
-        AC-000024
-
+        GT-000123
     """
 
     if _is_empty(employee_id):
 
+        return None
+
+    if str(employee_id).strip().lower() in {
+        "nan",
+        "none",
+        "<na>",
+    }:
         return None
 
     prefix = resolve_company_prefix(company)
@@ -140,14 +138,14 @@ def namespace_employee_id(
 
     if not digits:
 
-        logger.warning(
-            "Invalid employee ID: %s",
+        logger.error(
+            "Employee ID contains no digits: %s",
             employee_id,
         )
 
-        return None
+        raise ValueError(f"Invalid employee ID: {employee_id}")
 
-    return f"{prefix}-" f"{int(digits):06d}"
+    return f"{prefix}-{int(digits):06d}"
 
 
 # ============================================================
@@ -160,16 +158,7 @@ def normalize_manager_id(
     company: str,
 ) -> str | None:
     """
-    Normalize manager reference.
-
-    Example:
-
-        12765
-
-        becomes
-
-        GT-012765
-
+    Normalize manager references.
     """
 
     if _is_empty(manager_id):
@@ -191,13 +180,7 @@ def is_valid_employee_id(
     employee_id: str | None,
 ) -> bool:
     """
-    Validate canonical ID.
-
-    Valid:
-
-        GT-000001
-        AC-000001
-
+    Validate canonical employee ID.
     """
 
     if _is_empty(employee_id):
@@ -208,7 +191,7 @@ def is_valid_employee_id(
 
 
 # ============================================================
-# Employee ID DataFrame Transformation
+# DataFrame Employee ID Transformation
 # ============================================================
 
 
@@ -218,9 +201,10 @@ def namespace_employee_ids(
     id_column: str = "employee_id",
 ) -> pd.DataFrame:
     """
-    Namespace employee IDs.
+    Namespace employee IDs in dataframe.
 
-    Only HRIS sources should call this.
+    Invalid IDs are logged and converted to None
+    instead of crashing the pipeline.
 
     """
 
@@ -228,25 +212,56 @@ def namespace_employee_ids(
 
     if id_column not in df.columns:
 
-        return df
+        raise KeyError(f"Missing '{id_column}'")
 
     if company_column not in df.columns:
 
         raise KeyError(f"Missing '{company_column}'")
 
+    dead_letters = []
+
+    def process_row(row):
+
+        try:
+
+            return namespace_employee_id(
+                row[id_column],
+                row[company_column],
+            )
+
+        except ValueError as exc:
+
+            dead_letters.append(
+                {
+                    "employee_id": row[id_column],
+                    "company": row[company_column],
+                    "reason": str(exc),
+                }
+            )
+
+            return None
+
     df[id_column] = df.apply(
-        lambda row: namespace_employee_id(
-            row[id_column],
-            row[company_column],
-        ),
+        process_row,
         axis=1,
     )
+
+    if dead_letters:
+
+        logger.error(
+            """
+Employee ID dead-letter records:
+
+%s
+""",
+            dead_letters,
+        )
 
     return df
 
 
 # ============================================================
-# Manager ID DataFrame Transformation
+# Manager DataFrame Transformation
 # ============================================================
 
 
@@ -256,16 +271,7 @@ def namespace_manager_ids(
     manager_column: str = "manager_id",
 ) -> pd.DataFrame:
     """
-    Normalize manager references.
-
-    Example:
-
-        12765
-
-        becomes
-
-        GT-012765
-
+    Normalize manager IDs.
     """
 
     df = df.copy()
@@ -276,15 +282,25 @@ def namespace_manager_ids(
 
     if company_column not in df.columns:
 
-        logger.warning("Company column missing. Skipping managers.")
+        logger.warning("Missing company column. " "Skipping manager normalization.")
 
         return df
 
+    def process_manager(row):
+
+        try:
+
+            return normalize_manager_id(
+                row[manager_column],
+                row[company_column],
+            )
+
+        except ValueError:
+
+            return None
+
     df[manager_column] = df.apply(
-        lambda row: normalize_manager_id(
-            row[manager_column],
-            row[company_column],
-        ),
+        process_manager,
         axis=1,
     )
 
@@ -292,7 +308,7 @@ def namespace_manager_ids(
 
 
 # ============================================================
-# Validation Helpers
+# Validate DataFrame IDs
 # ============================================================
 
 

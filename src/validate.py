@@ -115,6 +115,17 @@ class DataQualityValidator:
             errors,
         )
 
+        logger.error(
+            """
+========== VALIDATION ERRORS ==========
+
+%s
+
+========================================
+""",
+            ("\n".join(map(str, self.errors)) if self.errors else "No errors"),
+        )
+
         self._pipeline_gate(summary)
 
         return {
@@ -542,12 +553,15 @@ Allowed range:
     ):
         """
         Validate employee hire dates.
+
+        Missing dates are allowed because:
+        - Some acquired employees may have incomplete HR records.
+        - Missing dates are handled as data quality warnings.
         """
 
         column = "hire_date"
 
         if column not in self.df.columns:
-
             return
 
         dates = pd.to_datetime(
@@ -558,14 +572,13 @@ Allowed range:
         config = rules.DATE_RANGES.get(column)
 
         if not config:
-
             return
 
         minimum = pd.Timestamp(config["minimum"])
 
         maximum = pd.Timestamp(config["maximum"])
 
-        invalid = dates.isna() | (dates < minimum) | (dates > maximum)
+        invalid = dates.notna() & ((dates < minimum) | (dates > maximum))
 
         failed_rows = self.df[invalid]
 
@@ -583,6 +596,26 @@ Allowed range:
             "Hire date between valid range",
             len(self.df),
             len(self.df) - failed,
+            failed,
+        )
+
+        logger.info(
+            """
+    ========== HIRE DATE VALIDATION ==========
+
+    Total employees:
+    %s
+
+    Missing hire dates:
+    %s
+
+    Invalid hire dates:
+    %s
+
+    ==========================================
+    """,
+            len(self.df),
+            int(dates.isna().sum()),
             failed,
         )
 
@@ -811,6 +844,29 @@ Allowed range:
                 "Pipeline blocked. " "Failed checks=%s Failure rate=%s%%",
                 summary["failed_checks"],
                 summary["failure_rate"],
+            )
+
+            logger.error(
+                """
+========== VALIDATION ERRORS ==========
+
+%s
+
+========================================
+""",
+                self.errors,
+            )
+
+            logger.error(
+                """
+========== QUALITY GATE FAILURE ==========
+
+Summary:
+%s
+
+==========================================
+""",
+                summary,
             )
 
             raise RuntimeError("Data quality gate failed")

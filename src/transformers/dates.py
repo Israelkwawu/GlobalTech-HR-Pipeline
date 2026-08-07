@@ -104,6 +104,9 @@ def parse_date(
 
         return None
 
+    if pd.isna(value):
+        return None
+
     # ------------------------------------------------------------
     # Already parsed dates
     # ------------------------------------------------------------
@@ -216,9 +219,21 @@ def normalize_date(
     Normalize date into ISO format.
 
     Output:
+        YYYY-MM-DD
 
-    YYYY-MM-DD
+    Invalid or missing dates return None.
     """
+
+    # Handle pandas missing values
+    if value is None or pd.isna(value):
+
+        logger.warning(
+            "Missing date value source=%s column=%s",
+            source,
+            column,
+        )
+
+        return None
 
     dt = parse_date(
         value,
@@ -226,7 +241,15 @@ def normalize_date(
         column,
     )
 
-    if dt is None:
+    # parse_date failed
+    if dt is None or pd.isna(dt):
+
+        logger.warning(
+            "Invalid date value=%s source=%s column=%s",
+            value,
+            source,
+            column,
+        )
 
         return None
 

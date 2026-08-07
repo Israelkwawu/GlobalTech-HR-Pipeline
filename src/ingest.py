@@ -31,6 +31,7 @@ from src.utils.helpers import (
     log_dataframe_schema,
     add_missing_columns,
     reorder_columns,
+    clean_date_columns,
 )
 
 from src.models.employee_schema import (
@@ -992,7 +993,7 @@ def align_employee_schema(
         # ============================================================
         "benefits": {
             "employee_id": "employee_id",
-            "plan_type": "plan_type",
+            "plan_type": "benefit_plan",
             "coverage_level": "coverage_level",
             "enrollment_date": "benefits_enrollment_date",
             "premium_employee": "premium_employee",
@@ -1026,6 +1027,15 @@ def align_employee_schema(
     aligned = add_missing_columns(
         aligned,
         EMPLOYEE_COLUMNS,
+    )
+
+    aligned = clean_date_columns(
+        aligned,
+        [
+            "hire_date",
+            "effective_date",
+            "benefits_enrollment_date",
+        ],
     )
 
     aligned = reorder_columns(
