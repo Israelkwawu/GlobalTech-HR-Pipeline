@@ -12,3 +12,4 @@ jupyter
 ipykernel
 python-dateutil
 pytest-mock
+black
