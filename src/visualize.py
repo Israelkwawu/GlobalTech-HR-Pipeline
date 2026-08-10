@@ -400,50 +400,400 @@ def chart_quality_summary(
     validation_result,
     output_dir,
 ):
+    """
+    Generate grouped data quality summary chart.
 
-    summary = (
-        validation_result.get(
-            "summary",
-            {},
+    Shows passed and failed records for each
+    individual validation check.
+    """
+
+    if not validation_result:
+        logger.warning(
+            "Quality summary chart skipped. "
+            "No validation result."
         )
-        if validation_result
-        else {}
+        return
+
+    report = validation_result.get(
+        "report",
+        pd.DataFrame(),
     )
 
-    passed = summary.get(
-        "passed_checks",
-        0,
-    )
+    if report is None or report.empty:
+        logger.warning(
+            "Quality summary chart skipped. "
+            "Validation report is empty."
+        )
+        return
 
-    failed = summary.get(
-        "failed_checks",
-        0,
-    )
+    required_columns = {
+        "check",
+        "passed",
+        "failed",
+    }
 
-    fig, ax = plt.subplots(figsize=(8, 5))
+    missing = required_columns - set(report.columns)
 
-    ax.bar(
+    if missing:
+        logger.warning(
+            "Quality summary chart skipped. "
+            "Missing columns=%s",
+            missing,
+        )
+        return
+
+    data = report[
         [
-            "Passed",
-            "Failed",
-        ],
-        [
-            passed,
-            failed,
-        ],
+            "check",
+            "passed",
+            "failed",
+        ]
+    ].copy()
+
+    # ------------------------------------------------------------
+    # Convert to numeric
+    # ------------------------------------------------------------
+
+    data["passed"] = pd.to_numeric(
+        data["passed"],
+        errors="coerce",
+    ).fillna(0)
+
+    data["failed"] = pd.to_numeric(
+        data["failed"],
+        errors="coerce",
+    ).fillna(0)
+
+    if data.empty:
+        return
+
+    # ------------------------------------------------------------
+    # Create grouped bar chart
+    # ------------------------------------------------------------
+
+    fig, ax = plt.subplots(
+        figsize=(14, 7)
     )
 
-    ax.set_title("Data Quality Summary")
+    x = range(len(data))
 
-    ax.set_ylabel("Checks")
+    width = 0.38
+
+    passed_bars = ax.bar(
+        [i - width / 2 for i in x],
+        data["passed"],
+        width=width,
+        label="Passed",
+    )
+
+    failed_bars = ax.bar(
+        [i + width / 2 for i in x],
+        data["failed"],
+        width=width,
+        label="Failed",
+    )
+
+    # ------------------------------------------------------------
+    # Axis configuration
+    # ------------------------------------------------------------
+
+    ax.set_title(
+        "Data Quality Summary"
+    )
+
+    ax.set_xlabel(
+        "Validation Check"
+    )
+
+    ax.set_ylabel(
+        "Records"
+    )
+
+    ax.set_xticks(
+        list(x)
+    )
+
+    ax.set_xticklabels(
+        data["check"],
+        rotation=45,
+        ha="right",
+    )
+
+    ax.legend()
+
+    # ------------------------------------------------------------
+    # Add values above bars
+    # ------------------------------------------------------------
+
+    for bar in passed_bars:
+
+        value = int(bar.get_height())
+
+        if value > 0:
+
+            ax.text(
+                bar.get_x()
+                + bar.get_width() / 2,
+                bar.get_height(),
+                str(value),
+                ha="center",
+                va="bottom",
+                fontsize=8,
+            )
+
+    for bar in failed_bars:
+
+        value = int(bar.get_height())
+
+        if value > 0:
+
+            ax.text(
+                bar.get_x()
+                + bar.get_width() / 2,
+                bar.get_height(),
+                str(value),
+                ha="center",
+                va="bottom",
+                fontsize=8,
+            )
 
     annotate_source(ax)
+
+    fig.tight_layout()
 
     save_chart(
         fig,
         output_dir / "06_quality_summary.png",
     )
 
+def chart_quality_granular(
+    validation_result: dict,
+    output_dir: Path,
+):
+    """
+    Generate granular data quality chart.
+
+    Shows the failure rate for every validation check,
+    while retaining passed and failed record counts.
+
+    The chart is sorted by failure rate so the checks
+    requiring the most attention appear at the top.
+    """
+
+    if not validation_result:
+        logger.warning(
+            "Granular quality chart skipped. "
+            "No validation result."
+        )
+        return
+
+    report = validation_result.get(
+        "report",
+        pd.DataFrame(),
+    )
+
+    if report is None or report.empty:
+        logger.warning(
+            "Granular quality chart skipped. "
+            "Validation report is empty."
+        )
+        return
+
+    required_columns = {
+        "check",
+        "total",
+        "passed",
+        "failed",
+    }
+
+    missing = required_columns - set(report.columns)
+
+    if missing:
+        logger.warning(
+            "Granular quality chart skipped. "
+            "Missing columns=%s",
+            missing,
+        )
+        return
+
+    data = report[
+        [
+            "check",
+            "total",
+            "passed",
+            "failed",
+        ]
+    ].copy()
+
+    # ------------------------------------------------------------
+    # Ensure numeric values
+    # ------------------------------------------------------------
+
+    for column in [
+        "total",
+        "passed",
+        "failed",
+    ]:
+        data[column] = pd.to_numeric(
+            data[column],
+            errors="coerce",
+        ).fillna(0)
+
+    # ------------------------------------------------------------
+    # Calculate failure rate
+    # ------------------------------------------------------------
+
+    data["failure_rate"] = 0.0
+
+    valid_total = data["total"] > 0
+
+    data.loc[
+        valid_total,
+        "failure_rate",
+    ] = (
+        data.loc[valid_total, "failed"]
+        / data.loc[valid_total, "total"]
+        * 100
+    )
+
+    # ------------------------------------------------------------
+    # Remove checks with no records
+    # ------------------------------------------------------------
+
+    data = data[
+        data["total"] > 0
+    ].copy()
+
+    if data.empty:
+        logger.warning(
+            "Granular quality chart skipped. "
+            "No validation records available."
+        )
+        return
+
+    # ------------------------------------------------------------
+    # Sort highest failure rate first
+    # ------------------------------------------------------------
+
+    data = data.sort_values(
+        "failure_rate",
+        ascending=True,
+    )
+
+    # ------------------------------------------------------------
+    # Create chart
+    # ------------------------------------------------------------
+
+    fig, ax = plt.subplots(
+        figsize=(
+            13,
+            max(7, len(data) * 0.5),
+        )
+    )
+
+    y = range(len(data))
+
+    bars = ax.barh(
+        y,
+        data["failure_rate"],
+    )
+
+    ax.set_yticks(y)
+
+    ax.set_yticklabels(
+        data["check"]
+    )
+
+    ax.set_xlabel(
+        "Failure Rate (%)"
+    )
+
+    ax.set_ylabel(
+        "Validation Check"
+    )
+
+    ax.set_title(
+        "Granular Data Quality — Failure Rate by Check"
+    )
+
+    # ------------------------------------------------------------
+    # Add failure-rate labels
+    # ------------------------------------------------------------
+
+    for index, (_, row) in enumerate(
+        data.iterrows()
+    ):
+
+        failure_rate = row["failure_rate"]
+
+        failed = int(row["failed"])
+
+        total = int(row["total"])
+
+        ax.text(
+            failure_rate,
+            index,
+            (
+                f"  {failure_rate:.2f}%"
+                f" ({failed}/{total})"
+            ),
+            va="center",
+            fontsize=9,
+        )
+
+    # ------------------------------------------------------------
+    # Highlight failed checks
+    # ------------------------------------------------------------
+
+    for bar, (_, row) in zip(
+        bars,
+        data.iterrows(),
+    ):
+
+        if row["failed"] > 0:
+
+            bar.set_alpha(1.0)
+
+        else:
+
+            bar.set_alpha(0.35)
+
+    # ------------------------------------------------------------
+    # Add overall quality information
+    # ------------------------------------------------------------
+
+    summary = validation_result.get(
+        "summary",
+        {},
+    )
+
+    overall_failure_rate = summary.get(
+        "failure_rate",
+        0,
+    )
+
+    ax.axvline(
+        overall_failure_rate,
+        linestyle="--",
+        linewidth=1,
+        label=(
+            f"Overall failure rate: "
+            f"{overall_failure_rate:.2f}%"
+        ),
+    )
+
+    ax.legend(
+        loc="lower right"
+    )
+
+    annotate_source(ax)
+
+    fig.tight_layout()
+
+    save_chart(
+        fig,
+        output_dir / "07_quality_granular.png",
+    )
 
 def create_eda_report_dashboard(
     df: pd.DataFrame,
@@ -495,21 +845,123 @@ def create_eda_report_dashboard(
     axes[0, 1].set_ylabel("Employees")
 
     # ------------------------------------------------
-    # Chart 3 Salary
+    # Chart 3 Salary Distribution by Employment Type
     # ------------------------------------------------
 
-    salary = pd.to_numeric(
-        df["salary_usd_annual"],
-        errors="coerce",
-    )
+    salary_column = "salary_usd_annual"
 
-    axes[1, 0].boxplot(
-        salary.dropna(),
-    )
+    if {
+        salary_column,
+        "employment_type",
+    }.issubset(df.columns):
 
-    axes[1, 0].set_title("Salary Distribution")
+        salary_data = df.copy()
 
-    axes[1, 0].set_ylabel("Annual Salary USD")
+        salary_data[salary_column] = ensure_numeric(
+            salary_data[salary_column]
+        )
+
+        salary_data = salary_data[
+            salary_data[salary_column].notna()
+            & (salary_data[salary_column] > 0)
+        ]
+
+        if not salary_data.empty:
+
+            groups = []
+            labels = []
+
+            for employment_type, group in (
+                salary_data
+                .groupby("employment_type")
+            ):
+
+                values = group[
+                    salary_column
+                ].dropna()
+
+                if not values.empty:
+
+                    groups.append(values)
+
+                    labels.append(
+                        str(employment_type)
+                    )
+
+            if groups:
+
+                axes[1, 0].boxplot(
+                    groups,
+                    tick_labels=labels,
+                    showmeans=True,
+                    patch_artist=False,
+                )
+
+                axes[1, 0].set_title(
+                    "Salary Distribution by Employment Type"
+                )
+
+                axes[1, 0].set_xlabel(
+                    "Employment Type"
+                )
+
+                axes[1, 0].set_ylabel(
+                    "Annual Salary (USD)"
+                )
+
+                axes[1, 0].tick_params(
+                    axis="x",
+                    rotation=30,
+                    labelsize=8,
+                )
+
+                axes[1, 0].yaxis.set_major_formatter(
+                    plt.FuncFormatter(
+                        lambda x, _: f"${x:,.0f}"
+                    )
+                )
+
+            else:
+
+                axes[1, 0].text(
+                    0.5,
+                    0.5,
+                    "No salary data available",
+                    ha="center",
+                    va="center",
+                )
+
+                axes[1, 0].set_title(
+                    "Salary Distribution by Employment Type"
+                )
+
+        else:
+
+            axes[1, 0].text(
+                0.5,
+                0.5,
+                "No valid salary data",
+                ha="center",
+                va="center",
+            )
+
+            axes[1, 0].set_title(
+                "Salary Distribution by Employment Type"
+            )
+
+    else:
+
+        axes[1, 0].text(
+            0.5,
+            0.5,
+            "Required salary fields unavailable",
+            ha="center",
+            va="center",
+        )
+
+        axes[1, 0].set_title(
+            "Salary Distribution by Employment Type"
+        )
 
     # ------------------------------------------------
     # Chart 4 Tenure
@@ -551,28 +1003,102 @@ def create_eda_report_dashboard(
     axes[2, 0].set_ylabel("%")
 
     # ------------------------------------------------
-    # Chart 6 Quality
+    # Chart 6 Quality - Granular
     # ------------------------------------------------
 
-    summary = validation_result["summary"]
-
-    axes[2, 1].bar(
-        ["Passed", "Failed"],
-        [
-            summary.get(
-                "passed_records",
-                0,
-            ),
-            summary.get(
-                "failed_records",
-                0,
-            ),
-        ],
+    report = validation_result.get(
+        "report",
+        pd.DataFrame(),
     )
 
-    axes[2, 1].set_title("Data Quality Summary")
+    if (
+        isinstance(report, pd.DataFrame)
+        and not report.empty
+        and {
+            "check",
+            "passed",
+            "failed",
+        }.issubset(report.columns)
+    ):
 
-    axes[2, 1].set_ylabel("Records")
+        quality = report[
+            [
+                "check",
+                "passed",
+                "failed",
+            ]
+        ].copy()
+
+        quality["passed"] = pd.to_numeric(
+            quality["passed"],
+            errors="coerce",
+        ).fillna(0)
+
+        quality["failed"] = pd.to_numeric(
+            quality["failed"],
+            errors="coerce",
+        ).fillna(0)
+
+        x = range(len(quality))
+
+        width = 0.38
+
+        axes[2, 1].bar(
+            [
+                i - width / 2
+                for i in x
+            ],
+            quality["passed"],
+            width=width,
+            label="Passed",
+        )
+
+        axes[2, 1].bar(
+            [
+                i + width / 2
+                for i in x
+            ],
+            quality["failed"],
+            width=width,
+            label="Failed",
+        )
+
+        axes[2, 1].set_xticks(
+            list(x)
+        )
+
+        axes[2, 1].set_xticklabels(
+            quality["check"],
+            rotation=45,
+            ha="right",
+            fontsize=7,
+        )
+
+        axes[2, 1].set_title(
+            "Data Quality Summary by Check"
+        )
+
+        axes[2, 1].set_ylabel(
+            "Records"
+        )
+
+        axes[2, 1].legend(
+            fontsize=8
+        )
+
+    else:
+
+        axes[2, 1].text(
+            0.5,
+            0.5,
+            "Validation report unavailable",
+            ha="center",
+            va="center",
+        )
+
+        axes[2, 1].set_title(
+            "Data Quality Summary"
+        )
 
     # Add header LAST
 
@@ -610,7 +1136,6 @@ def create_eda_report_dashboard(
     plt.close(fig)
 
     return output
-
 
 # ============================================================================
 # Dashboard Generator
@@ -673,6 +1198,11 @@ def generate_visualizations(
         validation_result,
         output_dir,
     )
+    
+    chart_quality_granular(
+        validation_result,
+        output_dir,
+    )
 
     dashboard = create_eda_report_dashboard(
         df,
@@ -691,6 +1221,7 @@ def generate_visualizations(
             "04_tenure_distribution.png",
             "05_benefits_enrollment.png",
             "06_quality_summary.png",
+            "07_quality_granular.png",
             "HR_EDA_Visualization_Report.png",
         ],
     }
