@@ -255,10 +255,7 @@ def log_dataframe_schema(
     """
     Log DataFrame schema.
     """
-    logger.info("%s schema:", name)
-
-    for column, dtype in df.dtypes.items():
-        logger.info("  %-25s %s", column, dtype)
+    logger.info("%s columns=%s", name, len(df.columns))
 
 
 def clean_date_columns(

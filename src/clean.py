@@ -38,7 +38,9 @@ from src.transformers.salary import (
 )
 
 from src.transformers.dates import (
+    flag_out_of_range_hire_dates,
     normalize_dates,
+    parse_known_date,
 )
 
 from src.transformers.employment_type import (
@@ -61,18 +63,11 @@ def format_dates(
     df: pd.DataFrame,
 ) -> pd.DataFrame:
     """
-    Convert supported date formats into ISO format.
+    Parse source dates into datetime64[ns].
 
-    Supported input formats
-    -----------------------
-    - YYYY-MM-DD
-    - DD/MM/YYYY
-    - DD-MM-YYYY
-    - Mixed formats
-
-    Output
-    ------
-    YYYY-MM-DD
+    Explicit formats are applied before any generic inference:
+    YYYY-MM-DD, MM/DD/YYYY, and DD-Mon-YYYY.
+    Hire dates before 1970-01-01 or after today are flagged.
     """
 
     df = df.copy()
@@ -89,60 +84,14 @@ def format_dates(
         if column not in df.columns:
             continue
 
-        # Preserve missing values
-        values = (
-            df[column]
-            .replace({"": pd.NA, "None": pd.NA, "nan": pd.NA})
-            .astype("string")
-            .str.strip()
-        )
-
-        # Allocate output
-        parsed = pd.Series(pd.NaT, index=df.index, dtype="datetime64[ns]")
-
-        # -----------------------------------------------------
-        # ISO dates (YYYY-MM-DD)
-        # -----------------------------------------------------
-        iso_mask = values.str.match(
-            r"^\d{4}-\d{2}-\d{2}$",
-            na=False,
-        )
-
-        parsed.loc[iso_mask] = pd.to_datetime(
-            values.loc[iso_mask],
-            format="%Y-%m-%d",
+        parsed = pd.to_datetime(
+            df[column].apply(parse_known_date),
             errors="coerce",
         )
 
-        # -----------------------------------------------------
-        # Day-first dates (DD/MM/YYYY or DD-MM-YYYY)
-        # -----------------------------------------------------
-        dmy_mask = values.str.match(
-            r"^\d{2}[/-]\d{2}[/-]\d{4}$",
-            na=False,
-        )
+        df[column] = parsed.astype("datetime64[ns]")
 
-        parsed.loc[dmy_mask] = pd.to_datetime(
-            values.loc[dmy_mask],
-            dayfirst=True,
-            errors="coerce",
-        )
-
-        # -----------------------------------------------------
-        # Remaining unknown formats
-        # -----------------------------------------------------
-        remaining = ~(iso_mask | dmy_mask)
-
-        if remaining.any():
-            parsed.loc[remaining] = pd.to_datetime(
-                values.loc[remaining],
-                format="mixed",
-                errors="coerce",
-            )
-
-        df[column] = parsed.dt.strftime("%Y-%m-%d")
-
-    return df
+    return flag_out_of_range_hire_dates(df)
 
 
 # ============================================================

@@ -1,6 +1,12 @@
 """Tests for explicit source date parsing."""
 
-from src.transformers.dates import normalize_date, parse_known_date
+import pandas as pd
+
+from src.transformers.dates import (
+    flag_out_of_range_hire_dates,
+    normalize_date,
+    parse_known_date,
+)
 
 
 def test_globaltech_iso_date():
@@ -20,6 +26,17 @@ def test_benefits_day_month_name_date():
     assert parsed.year == 2022
     assert parsed.month == 1
     assert parsed.day == 15
+
+
+def test_hire_date_out_of_range_is_flagged_and_kept():
+
+    df = pd.DataFrame({"hire_date": ["1969-12-31", "2020-01-15"]})
+
+    result = flag_out_of_range_hire_dates(df)
+
+    assert bool(result.loc[0, "hire_date_out_of_range"]) is True
+    assert bool(result.loc[1, "hire_date_out_of_range"]) is False
+    assert pd.Timestamp(result.loc[0, "hire_date"]) == pd.Timestamp("1969-12-31")
 
 
 def test_benefits_date_does_not_depend_on_generic_inference():

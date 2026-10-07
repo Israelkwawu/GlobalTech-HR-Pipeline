@@ -193,13 +193,6 @@ def combine_ghost_reports(
         ignore_index=True,
     )
 
-    logger.info(
-        """
-Ghost employee report generated.
-
-Total=%s
-""",
-        len(result),
-    )
+    logger.info("Ghost employee report rows=%s", len(result))
 
     return result

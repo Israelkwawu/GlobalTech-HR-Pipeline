@@ -7,7 +7,7 @@ Responsibilities
 - Resolve employee namespaces
 - Normalize payroll identifiers
 - Normalize salaries
-- Treat payroll base_salary as annual compensation
+- Annualize pay frequency before converting to USD
 - Convert currency to USD
 - Merge payroll enrichment
 - Preserve provenance
@@ -23,6 +23,8 @@ import re
 import pandas as pd
 
 from config.logging_config import get_logger
+
+from src.transformers.salary import annualize_salary
 
 logger = get_logger(__name__)
 
@@ -204,31 +206,16 @@ def calculate_salary_annual(
     row,
 ):
     """
-    IMPORTANT
+    Convert a pay-period salary to an annual amount.
 
-    Payroll base_salary is already annual.
-
-    pay_frequency is metadata only.
-
-    DO NOT multiply.
-
-    Example:
-
-    59714 Bi-Weekly
-
-    remains:
-
-    59714 annual salary
-
+    Monthly is multiplied by 12 and bi-weekly by 26.
+    The original salary column is left unchanged.
     """
 
-    salary = row.get("salary_numeric")
-
-    if pd.isna(salary):
-
-        return None
-
-    return salary
+    return annualize_salary(
+        row.get("salary_numeric"),
+        row.get("pay_frequency"),
+    )
 
 
 # ============================================================
@@ -262,7 +249,7 @@ def calculate_salary_usd(
         1,
     )
 
-    return salary * rate
+    return round(salary * rate, 2)
 
 
 # ============================================================
@@ -293,11 +280,9 @@ def prepare_payroll(
 
         else:
 
-            logger.warning("""
-Payroll has no company origin.
-
-Defaulting GlobalTech.
-""")
+            logger.warning(
+                "Payroll has no company origin. Defaulting company_origin=GlobalTech"
+            )
 
             payroll["company_origin"] = "GlobalTech"
 
@@ -330,25 +315,9 @@ Defaulting GlobalTech.
     )
 
     logger.info(
-        """
-========== PAYROLL SALARY CHECK ==========
-
-%s
-
-==========================================
-""",
-        payroll[
-            [
-                "employee_id",
-                "salary",
-                "currency",
-                "pay_frequency",
-                "salary_annual",
-                "salary_usd_annual",
-            ]
-        ]
-        .head(20)
-        .to_string(),
+        "Payroll salaries annualized rows=%s usd_populated=%s",
+        len(payroll),
+        int(payroll["salary_usd_annual"].notna().sum()),
     )
 
     return payroll
@@ -455,22 +424,9 @@ def merge_payroll(
     payroll = select_payroll_columns(payroll)
 
     logger.info(
-        """
-========== MATCH CHECK ==========
-
-Employee IDs:
-
-%s
-
-
-Payroll IDs:
-
-%s
-
-=================================
-""",
-        employees["employee_id"].head().tolist(),
-        payroll["employee_id"].head().tolist(),
+        "Payroll merge keys employees=%s payroll=%s",
+        employees["employee_id"].nunique(),
+        payroll["employee_id"].nunique(),
     )
 
     merged = employees.merge(
@@ -563,23 +519,10 @@ Payroll IDs:
     )
 
     logger.info(
-        """
-========== PAYROLL MERGE RESULT ==========
-
-Rows:
-%s
-
-Salary populated:
-%s
-
-Salary USD populated:
-%s
-
-==========================================
-""",
+        "Payroll merge rows=%s salary=%s salary_usd=%s",
         len(merged),
-        merged["salary"].notna().sum(),
-        merged["salary_usd_annual"].notna().sum(),
+        int(merged["salary"].notna().sum()),
+        int(merged["salary_usd_annual"].notna().sum()),
     )
 
     return merged

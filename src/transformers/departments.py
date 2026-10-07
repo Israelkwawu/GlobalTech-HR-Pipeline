@@ -79,17 +79,7 @@ def map_department(
     else:
         raise ValueError(f"Unsupported company: {company}")
 
-    result = mapping.get(department)
-
-    if result is None:
-
-        logger.warning(
-            "Unmapped department '%s' from %s",
-            department,
-            company,
-        )
-
-    return result
+    return mapping.get(department)
 
 
 def map_departments(
@@ -115,6 +105,8 @@ def map_departments(
 
     logger.info("Mapping departments...")
 
+    original = df[department_column].copy()
+
     df[department_column] = df.apply(
         lambda row: map_department(
             row[department_column],
@@ -122,6 +114,22 @@ def map_departments(
         ),
         axis=1,
     )
+
+    lost = original.notna() & df[department_column].isna()
+
+    if lost.any():
+        pairs = pd.DataFrame(
+            {
+                "department": original[lost],
+                "company": df.loc[lost, company_column],
+            }
+        ).drop_duplicates()
+        logger.warning(
+            "Unmapped departments rows=%s unique=%s examples=%s",
+            int(lost.sum()),
+            len(pairs),
+            pairs.head(8).to_dict("records"),
+        )
 
     return df
 

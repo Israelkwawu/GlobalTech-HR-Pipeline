@@ -223,53 +223,16 @@ def normalize_payroll(
     # Validation logging
     # --------------------------------------------------------
 
-    logger.info(
-        """
-========== PAYROLL NORMALIZATION ==========
-Rows: %s
-
-Columns:
-%s
-
-Salary fields:
-%s
-==========================================
-""",
-        len(df),
-        list(df.columns),
-        [
-            column
-            for column in [
-                "salary",
-                "salary_numeric",
-                "salary_annual",
-                "salary_usd_annual",
-                "currency",
-                "pay_frequency",
-            ]
-            if column in df.columns
-        ],
+    populated = (
+        int(df["salary_usd_annual"].notna().sum())
+        if "salary_usd_annual" in df.columns
+        else 0
     )
 
-    if "salary_usd_annual" in df.columns:
-
-        logger.info(
-            "Salary USD sample:\n%s",
-            df[
-                [
-                    c
-                    for c in [
-                        "employee_id",
-                        "salary",
-                        "currency",
-                        "pay_frequency",
-                        "salary_usd_annual",
-                    ]
-                    if c in df.columns
-                ]
-            ]
-            .head(5)
-            .to_string(),
-        )
+    logger.info(
+        "Payroll normalized rows=%s salary_usd=%s",
+        len(df),
+        populated,
+    )
 
     return df

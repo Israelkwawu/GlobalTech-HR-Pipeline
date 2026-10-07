@@ -121,16 +121,12 @@ class DataQualityValidator:
             errors,
         )
 
-        logger.error(
-            """
-========== VALIDATION ERRORS ==========
-
-%s
-
-========================================
-""",
-            ("\n".join(map(str, self.errors)) if self.errors else "No errors"),
-        )
+        if self.errors:
+            logger.warning(
+                "Validation failures=%s. Row detail is in %s",
+                len(self.errors),
+                self.output_dir / "validation_errors.csv",
+            )
 
         self._pipeline_gate(summary)
 
@@ -556,28 +552,7 @@ class DataQualityValidator:
         missing_salary_count = int((~has_salary).sum())
 
         logger.info(
-            """
-========== SALARY VALIDATION ==========
-
-Total employees:
-%s
-
-Employees with payroll salary:
-%s
-
-Employees without payroll salary:
-%s
-
-Salary validation failures:
-%s
-
-Allowed range:
-%s - %s
-
-======================================
-
-""",
-            len(self.df),
+            "Salary check populated=%s missing=%s failed=%s range=%s-%s",
             validated_records,
             missing_salary_count,
             failed,
@@ -611,10 +586,15 @@ Allowed range:
 
             return
 
+        raw = self.df[column]
         dates = pd.to_datetime(
-            self.df[column],
+            raw,
             errors="coerce",
+            format="mixed",
         )
+
+        text = raw.astype("string").str.strip()
+        present = text.notna() & ~text.str.lower().isin(["", "nat", "none", "nan", "<na>"])
 
         config = rules.DATE_RANGES.get(column)
 
@@ -627,7 +607,9 @@ Allowed range:
 
         dates = dates.dt.normalize()
 
-        invalid = dates.notna() & ((dates < minimum) | (dates > maximum))
+        invalid = (present & dates.isna()) | (
+            dates.notna() & ((dates < minimum) | (dates > maximum))
+        )
 
         failed_rows = self.df[invalid]
 
@@ -649,21 +631,7 @@ Allowed range:
         )
 
         logger.info(
-            """
-    ========== HIRE DATE VALIDATION ==========
-
-    Total employees:
-    %s
-
-    Missing hire dates:
-    %s
-
-    Invalid hire dates:
-    %s
-
-    ==========================================
-    """,
-            len(self.df),
+            "Hire date check missing=%s invalid=%s",
             int(dates.isna().sum()),
             failed,
         )
@@ -914,32 +882,9 @@ Allowed range:
         if not summary["pipeline_passed"]:
 
             logger.critical(
-                "Pipeline blocked. " "Failed checks=%s Failure rate=%s%%",
+                "Pipeline blocked. Failed checks=%s. See %s",
                 summary["failed_checks"],
-                summary["failure_rate"],
-            )
-
-            logger.error(
-                """
-========== VALIDATION ERRORS ==========
-
-%s
-
-========================================
-""",
-                self.errors,
-            )
-
-            logger.error(
-                """
-========== QUALITY GATE FAILURE ==========
-
-Summary:
-%s
-
-==========================================
-""",
-                summary,
+                self.output_dir / "validation_report.csv",
             )
 
             raise RuntimeError("Data quality gate failed")

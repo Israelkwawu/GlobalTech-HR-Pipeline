@@ -27,9 +27,8 @@ from src.matching.fuzzy_match import fuzzy_match
 
 
 from src.matching.ghost_detection import (
-    detect_payroll_ghosts,
     detect_benefits_ghosts,
-    combine_ghost_reports,
+    detect_payroll_ghosts,
 )
 
 
@@ -500,7 +499,7 @@ def deduplicate_employees(
     benefits_df,
 ):
 
-    logger.info("===== DEDUPLICATION START =====")
+    logger.info("Deduplication start")
 
     employees = _prepare_source(
         employee_df,
@@ -522,18 +521,7 @@ def deduplicate_employees(
     benefits = _ensure_row_provenance(benefits, "benefits")
 
     logger.info(
-        """
-SOURCE COUNTS
-
-Employees:
-%s
-
-Payroll:
-%s
-
-Benefits:
-%s
-""",
+        "Dedup sources employees=%s payroll=%s benefits=%s",
         len(employees),
         len(payroll),
         len(benefits),
@@ -577,10 +565,13 @@ Benefits:
         benefits,
     )
 
-    ghosts = combine_ghost_reports(
-        payroll_ghosts,
-        benefits_ghosts,
-    )
+    if not benefits_ghosts.empty:
+        logger.warning(
+            "Benefits rows with no HRIS match=%s. They stay out of the payroll ghost report.",
+            len(benefits_ghosts),
+        )
+
+    ghosts = payroll_ghosts
 
     # --------------------------------------------------------
     # Enrich, then collapse any remaining exact ids
@@ -619,28 +610,17 @@ Benefits:
 
         raise RuntimeError(f"Golden dataset duplicate IDs={duplicate_ids}")
 
+    salary_populated = (
+        int(golden_dataset["salary"].notna().sum())
+        if "salary" in golden_dataset.columns
+        else 0
+    )
+
     logger.info(
-        """
-===== GOLDEN DATASET READY =====
-
-Rows:
-%s
-
-Unique employees:
-%s
-
-Salary populated:
-%s
-
-================================
-""",
+        "Golden dataset ready rows=%s unique=%s salary=%s",
         len(golden_dataset),
         golden_dataset["employee_id"].nunique(),
-        (
-            golden_dataset["salary"].notna().sum()
-            if "salary" in golden_dataset.columns
-            else 0
-        ),
+        salary_populated,
     )
 
     return {

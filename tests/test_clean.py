@@ -36,7 +36,9 @@ def test_clean_pipeline():
 
     assert result.loc[0, "salary_usd_annual"] == 12000
 
-    assert result.loc[0, "hire_date"] == "2016-09-21"
+    assert pd.Timestamp(result.loc[0, "hire_date"]) == pd.Timestamp("2016-09-21")
+    assert str(result["hire_date"].dtype) == "datetime64[ns]"
+    assert bool(result.loc[0, "hire_date_out_of_range"]) is False
 
 
 def test_clean_pipeline_partial_dataframe():

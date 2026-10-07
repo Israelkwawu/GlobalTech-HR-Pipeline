@@ -321,18 +321,9 @@ def load_acquiredco_hris(
 
         page_frames = []
 
-        for page_number, start in enumerate(
-            range(0, total_records, page_size),
-            start=1,
-        ):
+        for start in range(0, total_records, page_size):
             end = min(start + page_size, total_records)
             page_records = records[start:end]
-
-            logger.info(
-                "Fetched page %s (%s records)",
-                page_number,
-                len(page_records),
-            )
 
             if page_records:
                 page_frames.append(pd.json_normalize(page_records))
@@ -341,6 +332,13 @@ def load_acquiredco_hris(
             pd.concat(page_frames, ignore_index=True)
             if page_frames
             else pd.DataFrame()
+        )
+
+        logger.info(
+            "AcquiredCo pages=%s records=%s page_size=%s",
+            len(page_frames),
+            len(df),
+            page_size,
         )
 
         # ------------------------------------------------------------------
@@ -652,19 +650,7 @@ def load_payroll(
             engine="openpyxl",
         )
 
-        logger.info(
-            """
-========== RAW PAYROLL ==========
-Rows:
-%s
-
-Columns:
-%s
-=================================
-""",
-            len(df),
-            list(df.columns),
-        )
+        logger.info("Payroll rows=%s", len(df))
 
         # ==================================================
         # Normalize columns
@@ -716,14 +702,9 @@ Columns:
 
             if not found_company:
 
-                logger.warning("""
-Payroll file has no company information.
-
-Defaulting company_origin=GlobalTech.
-
-If AcquiredCo payroll exists,
-provide company_origin column.
-""")
+                logger.warning(
+                    "Payroll file has no company information. Defaulting company_origin=GlobalTech"
+                )
 
                 df["company_origin"] = "GlobalTech"
 
@@ -805,55 +786,9 @@ Payroll file missing employee_id column
         ).sum()
 
         logger.info(
-            """
-========== PAYROLL SUMMARY ==========
-
-Rows:
-%s
-
-Unique employees:
-%s
-
-Duplicate IDs:
-%s
-
-
-Company distribution:
-
-%s
-
-=====================================
-""",
-            len(df),
+            "Payroll unique_ids=%s duplicate_rows=%s",
             df["employee_id"].nunique(),
-            duplicate_ids,
-            df["company_origin"].value_counts().to_string(),
-        )
-
-        # ==================================================
-        # Salary diagnostics
-        # ==================================================
-
-        salary_columns = [
-            c
-            for c in [
-                "employee_id",
-                "company_origin",
-                "salary",
-                "currency",
-                "pay_frequency",
-            ]
-            if c in df.columns
-        ]
-
-        logger.info(
-            """
-PAYROLL SAMPLE
-
-%s
-
-""",
-            df[salary_columns].head(10).to_string(),
+            int(duplicate_ids),
         )
 
         # ==================================================

@@ -292,12 +292,6 @@ def normalize_date(
     # Handle pandas missing values
     if value is None or pd.isna(value):
 
-        logger.warning(
-            "Missing date value source=%s column=%s",
-            source,
-            column,
-        )
-
         return None
 
     dt = parse_date(
@@ -309,38 +303,29 @@ def normalize_date(
     # parse_date failed
     if dt is None or pd.isna(dt):
 
-        logger.warning(
-            "Invalid date value=%s source=%s column=%s",
-            value,
-            source,
-            column,
-        )
-
         return None
 
     return dt.strftime(ISO_DATE_FORMAT)
 
 
 def validate_hire_date(
-    value: str | None,
+    value: str | datetime | pd.Timestamp | None,
 ) -> bool:
     """
-    Validate normalized hire date.
+    Return whether a hire date falls on or between 1970-01-01 and today.
     """
 
-    if value is None:
-
+    if value is None or (not isinstance(value, (datetime, pd.Timestamp)) and pd.isna(value)):
         return False
 
-    try:
+    if isinstance(value, pd.Timestamp):
+        dt = value.to_pydatetime()
+    elif isinstance(value, datetime):
+        dt = value
+    else:
+        dt = parse_known_date(value)
 
-        dt = datetime.strptime(
-            value,
-            ISO_DATE_FORMAT,
-        )
-
-    except ValueError:
-
+    if dt is None:
         return False
 
     earliest = datetime(MIN_HIRE_YEAR, 1, 1)
@@ -352,6 +337,37 @@ def validate_hire_date(
 # ============================================================================
 # DataFrame Functions
 # ============================================================================
+
+
+def flag_out_of_range_hire_dates(
+    df: pd.DataFrame,
+) -> pd.DataFrame:
+    """
+    Flag hire dates before 1970-01-01 or after today.
+
+    The parsed date is kept. hire_date_out_of_range records the exception
+    for HR review during transformation.
+    """
+
+    df = df.copy()
+
+    if "hire_date" not in df.columns:
+        return df
+
+    dates = pd.to_datetime(df["hire_date"], errors="coerce").dt.normalize()
+    earliest = pd.Timestamp("1970-01-01")
+    today = pd.Timestamp.today().normalize()
+    df["hire_date_out_of_range"] = dates.notna() & ((dates < earliest) | (dates > today))
+
+    flagged = int(df["hire_date_out_of_range"].sum())
+
+    if flagged:
+        logger.warning(
+            "Hire dates outside 1970-01-01 through today: %s",
+            flagged,
+        )
+
+    return df
 
 
 def normalize_date_column(
@@ -374,13 +390,18 @@ def normalize_date_column(
         column,
     )
 
-    df[column] = df[column].apply(
+    parsed = df[column].apply(
         lambda value: normalize_date(
             value,
             source,
             column,
         )
     )
+
+    df[column] = pd.to_datetime(parsed, errors="coerce").astype("datetime64[ns]")
+
+    if column == "hire_date":
+        df = flag_out_of_range_hire_dates(df)
 
     return df
 
@@ -415,7 +436,7 @@ def normalize_dates(
             column,
         )
 
-        df[column] = df[column].apply(
+        parsed = df[column].apply(
             lambda value: normalize_date(
                 value,
                 source,
@@ -423,7 +444,9 @@ def normalize_dates(
             )
         )
 
-    return df
+        df[column] = pd.to_datetime(parsed, errors="coerce").astype("datetime64[ns]")
+
+    return flag_out_of_range_hire_dates(df)
 
 
 def validate_date_column(

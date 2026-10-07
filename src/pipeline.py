@@ -593,6 +593,11 @@ class HRPipeline:
         if ghost_employees is not None:
             ghost_frame = ghost_employees.copy()
 
+            if "source_system" in ghost_frame.columns:
+                ghost_frame = ghost_frame.loc[
+                    ghost_frame["source_system"].astype(str).eq("payroll")
+                ].copy()
+
             for column in ghost_columns:
                 if column not in ghost_frame.columns:
                     ghost_frame[column] = pd.NA
@@ -657,97 +662,22 @@ class HRPipeline:
     def run(self) -> dict:
         """
         Execute complete ETL pipeline.
-
-        Includes diagnostic logging for:
-        - salary transformation
-        - payroll enrichment
-        - golden dataset quality
         """
 
         logger.info("===== HR PIPELINE START =====")
 
-        # ========================================================
-        # 1. INGEST
-        # ========================================================
-
         sources = self.ingest()
-
-        for name, df in sources.items():
-
-            logger.info(
-                "[INGEST] %s rows=%s columns=%s",
-                name,
-                len(df),
-                list(df.columns),
-            )
-
-        # ========================================================
-        # 2. TRANSFORM
-        # ========================================================
 
         logger.info("===== TRANSFORMATION START =====")
 
         transformed = self.transform(sources)
 
         employees = transformed["employees"]
-
         payroll = transformed["payroll"]
-
         benefits = transformed["benefits"]
 
-        logger.info(
-            "[EMPLOYEES] rows=%s columns=%s",
-            len(employees),
-            list(employees.columns),
-        )
-
-        logger.info(
-            "[PAYROLL] rows=%s columns=%s",
-            len(payroll),
-            list(payroll.columns),
-        )
-
-        logger.info(
-            "[BENEFITS] rows=%s columns=%s",
-            len(benefits),
-            list(benefits.columns),
-        )
-
-        # ========================================================
-        # Salary diagnostic after payroll transform
-        # ========================================================
-
-        salary_columns = [
-            "employee_id",
-            "salary",
-            "currency",
-            "pay_frequency",
-            "salary_usd_annual",
-        ]
-
-        existing_salary_columns = [c for c in salary_columns if c in payroll.columns]
-
-        if existing_salary_columns:
-
-            logger.info(
-                "Payroll salary preview:\n%s",
-                payroll[existing_salary_columns].head(10).to_string(),
-            )
-
-            if "salary_usd_annual" in payroll.columns:
-
-                logger.info(
-                    "Payroll salary_usd_annual stats:\n%s",
-                    payroll["salary_usd_annual"].describe().to_string(),
-                )
-
-        else:
-
+        if "salary_usd_annual" not in payroll.columns:
             logger.warning("No salary columns found after payroll transformation")
-
-        # ========================================================
-        # 3. DEDUPLICATION
-        # ========================================================
 
         logger.info("===== DEDUPLICATION START =====")
 
@@ -759,87 +689,20 @@ class HRPipeline:
 
         golden_dataset = deduplication_result["golden_dataset"]
 
-        logger.info(
-            "[GOLDEN BEFORE CLEANUP] rows=%s columns=%s",
-            len(golden_dataset),
-            list(golden_dataset.columns),
-        )
-
-        # ========================================================
-        # Salary diagnostic after merge
-        # ========================================================
-
-        existing_salary_columns = [
-            c for c in salary_columns if c in golden_dataset.columns
-        ]
-
-        if existing_salary_columns:
-
-            logger.info(
-                "Golden salary preview:\n%s",
-                golden_dataset[existing_salary_columns].head(10).to_string(),
-            )
-
-        else:
-
+        if "salary_usd_annual" not in golden_dataset.columns:
             logger.error("Salary columns disappeared after enrichment")
-
-        # ========================================================
-        # 4. FINAL CLEANUP
-        # ========================================================
 
         logger.info("Preparing final golden dataset...")
 
         golden_dataset = prepare_golden_dataset(golden_dataset)
 
         logger.info(
-            "[GOLDEN AFTER CLEANUP] rows=%s columns=%s",
+            "Golden dataset rows=%s",
             len(golden_dataset),
-            list(golden_dataset.columns),
         )
 
-        # ========================================================
-        # Final Salary Validation Diagnostic
-        # ========================================================
-
-        salary_columns = [
-            "salary",
-            "salary_numeric",
-            "salary_annual",
-            "salary_usd_annual",
-            "currency",
-            "pay_frequency",
-        ]
-
-        existing_salary_columns = [
-            c for c in salary_columns if c in golden_dataset.columns
-        ]
-
-        if existing_salary_columns:
-
-            logger.info(
-                """
-                ========== FINAL SALARY CHECK ==========
-                Columns:
-                %s
-
-                Sample:
-                %s
-
-                Statistics:
-                %s
-                ========================================
-                """,
-                existing_salary_columns,
-                golden_dataset[existing_salary_columns].head(20).to_string(),
-                golden_dataset[existing_salary_columns]
-                .describe(include="all")
-                .to_string(),
-            )
-
-        else:
-
-            logger.error("FINAL DATASET HAS NO SALARY FIELDS")
+        if "salary_usd_annual" not in golden_dataset.columns:
+            logger.error("Final dataset has no salary fields")
 
         # ========================================================
         # 5. VALIDATION
