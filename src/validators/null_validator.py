@@ -26,6 +26,26 @@ class NullValidator(BaseValidator):
 
         errors = []
 
+        missing_fields = [
+            field for field in self.required_fields if field not in df.columns
+        ]
+
+        if df.empty and missing_fields:
+
+            for field in missing_fields:
+
+                errors.append(
+                    {
+                        "employee_id": None,
+                        "rule": "MISSING_COLUMN",
+                        "column": field,
+                        "value": None,
+                        "message": f"Missing required field {field}",
+                    }
+                )
+
+            return pd.DataFrame(errors)
+
         for _, row in df.iterrows():
 
             for field in self.required_fields:

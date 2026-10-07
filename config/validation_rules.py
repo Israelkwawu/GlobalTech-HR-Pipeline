@@ -15,6 +15,8 @@ Author: Israel Kwawu
 
 from __future__ import annotations
 
+from datetime import date
+
 # ============================================================
 # Required Fields
 # ============================================================
@@ -94,8 +96,8 @@ NUMERIC_RANGES = {
 
 DATE_RANGES = {
     "hire_date": {
-        "minimum": "1980-01-01",
-        "maximum": "2030-12-31",
+        "minimum": "1970-01-01",
+        "maximum": date.today().isoformat(),
     }
 }
 
@@ -105,11 +107,7 @@ DATE_RANGES = {
 # ============================================================
 
 
-# Maximum allowed failed validation checks
+# Halt only when more than this many checks fail.
+# One or two failing checks stay in the report and do not block delivery.
 
-MAX_FAILED_CHECKS = 0
-
-
-# Maximum allowed percentage of failed rows
-
-MAX_FAILURE_RATE = 0.0
+MAX_FAILED_CHECKS = 2

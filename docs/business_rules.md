@@ -4,6 +4,14 @@
 
 This document defines business logic applied during processing.
 
+## Why these thresholds
+
+- **88% name similarity.** Close spellings still match. Pairs are reviewed by HR and are not merged, because a wrong merge changes pay. A lower cutoff fills the review file with people who only share a surname.
+- **30-day hire window.** Hires more than a month apart are treated as different people. The window also limits comparisons to a date band instead of every employee against every employee.
+- **HRIS over payroll over benefits.** Name, department, country, and company stay with HRIS. Pay is filled from payroll. Benefits adds enrollment only. Payroll must not overwrite `company_origin`, or jurisdiction reports follow the pay file instead of the HR file.
+- **Gate at more than two failed checks.** One or two broken checks are reported and the extract still ships. A third failed check blocks delivery so payroll does not load a file with several rule families broken.
+- **Partitioned Parquet.** Finance filters GlobalTech and AcquiredCo separately. Partitioning by `company_origin` keeps those reads on one company. Review files stay CSV so HR can open them without a parquet reader.
+
 ---
 
 # Employee Identification Rules

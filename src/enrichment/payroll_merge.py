@@ -403,7 +403,6 @@ def select_payroll_columns(
         "salary_usd_annual",
         "bonus_target_pct",
         "effective_date",
-        "company_origin",
     ]
 
     available = [c for c in columns if c in payroll.columns]
@@ -497,7 +496,6 @@ Payroll IDs:
         "salary_usd_annual",
         "bonus_target_pct",
         "effective_date",
-        "company_origin",
     ]
 
     for field in fields:
@@ -527,18 +525,42 @@ Payroll IDs:
     # Provenance
     # ------------------------------------------------
 
-    if "source_systems" in merged.columns:
+    matched = pd.Series(False, index=merged.index)
 
-        merged["source_systems"] = (
-            merged["source_systems"]
-            .fillna("")
-            .astype(str)
-            .apply(lambda x: x if "payroll" in x else f"{x},payroll")
-        )
+    for salary_column in ("salary_usd_annual", "salary"):
 
-    else:
+        if salary_column in merged.columns:
 
-        merged["source_systems"] = "payroll"
+            matched = matched | merged[salary_column].notna()
+
+    if "source_systems" not in merged.columns:
+
+        merged["source_systems"] = ""
+
+    if "dedup_method" not in merged.columns:
+
+        merged["dedup_method"] = "single_source"
+
+    def _append_source(value: str, source: str) -> str:
+
+        parts = [part for part in str(value).split(",") if part and part not in {"nan", "None"}]
+
+        if source not in parts:
+
+            parts.append(source)
+
+        return ",".join(parts)
+
+    merged.loc[matched, "source_systems"] = merged.loc[matched, "source_systems"].map(
+        lambda value: _append_source(value, "payroll")
+    )
+
+    current_method = merged.loc[matched, "dedup_method"].fillna("single_source")
+
+    merged.loc[matched, "dedup_method"] = current_method.where(
+        current_method.ne("single_source"),
+        "exact_id",
+    )
 
     logger.info(
         """

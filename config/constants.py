@@ -184,8 +184,8 @@ DATE_FORMAT_GLOBALTECH = "%Y-%m-%d"
 DATE_FORMAT_ACQUIREDCO = "%Y-%m-%dT%H:%M:%S"
 
 # Benefits XML
-# Example: 2024-03-23
-DATE_FORMAT_BENEFITS = "%Y-%m-%d"
+# Example: 15-Jan-2022
+DATE_FORMAT_BENEFITS = "%d-%b-%Y"
 
 # Payroll Excel
 # Example: 2023-05-12

@@ -7,7 +7,7 @@ These utilities provide reusable operations for:
 - Logging summaries
 - Timestamp generation
 
-Author: Your Name
+Author: Israel Kwawu
 """
 
 from __future__ import annotations
@@ -16,6 +16,8 @@ from datetime import datetime, timezone
 
 import logging
 import pandas as pd
+
+from src.transformers.dates import parse_known_date
 
 logger = logging.getLogger(__name__)
 
@@ -289,7 +291,7 @@ def clean_date_columns(
         if column in df.columns:
 
             df[column] = pd.to_datetime(
-                df[column],
+                df[column].apply(parse_known_date),
                 errors="coerce",
             )
 

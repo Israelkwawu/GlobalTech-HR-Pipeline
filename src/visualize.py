@@ -849,7 +849,10 @@ def create_eda_report_dashboard(
 
         except Exception:
 
-            pass
+            logger.warning(
+                "Unable to normalize hire date timezone for the tenure chart.",
+                exc_info=True,
+            )
 
         today = pd.Timestamp.today()
 

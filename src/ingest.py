@@ -310,29 +310,38 @@ def load_acquiredco_hris(
 
         total_records = len(records)
 
+        if page_size < 1:
+            raise ValueError("page_size must be at least 1")
+
         logger.info(
             "Beginning paginated ingestion (%s records, page size=%s)",
             total_records,
             page_size,
         )
 
+        page_frames = []
+
         for page_number, start in enumerate(
             range(0, total_records, page_size),
             start=1,
         ):
             end = min(start + page_size, total_records)
+            page_records = records[start:end]
 
             logger.info(
                 "Fetched page %s (%s records)",
                 page_number,
-                end - start,
+                len(page_records),
             )
 
-        # ------------------------------------------------------------------
-        # Flatten nested JSON
-        # ------------------------------------------------------------------
+            if page_records:
+                page_frames.append(pd.json_normalize(page_records))
 
-        df = pd.json_normalize(records)
+        df = (
+            pd.concat(page_frames, ignore_index=True)
+            if page_frames
+            else pd.DataFrame()
+        )
 
         # ------------------------------------------------------------------
         # Basic standardization
@@ -1015,14 +1024,39 @@ def align_employee_schema(
         df[list(available_columns.keys())].rename(columns=available_columns).copy()
     )
 
-    aligned["source_system"] = source_system
-
-    aligned["company_origin"] = {
+    company_defaults = {
         "globaltech_hris": "GlobalTech",
         "acquiredco_hris": "AcquiredCo",
-        "payroll": "Payroll",
-        "benefits": "Benefits",
-    }.get(source_system, "Unknown")
+        "payroll": "GlobalTech",
+        "benefits": "GlobalTech",
+    }
+    default_company = company_defaults.get(source_system, "Unknown")
+
+    aligned["source_system"] = source_system
+    aligned["source_systems"] = source_system
+    aligned["dedup_method"] = "single_source"
+
+    if "company_origin" not in aligned.columns:
+        aligned["company_origin"] = default_company
+    else:
+        aligned["company_origin"] = (
+            aligned["company_origin"]
+            .astype("string")
+            .str.strip()
+            .replace(
+                {
+                    "globaltech": "GlobalTech",
+                    "Global Tech": "GlobalTech",
+                    "GLOBALTECH": "GlobalTech",
+                    "acquiredco": "AcquiredCo",
+                    "Acquired Co": "AcquiredCo",
+                    "ACQUIREDCO": "AcquiredCo",
+                    "Payroll": pd.NA,
+                    "Benefits": pd.NA,
+                }
+            )
+            .fillna(default_company)
+        )
 
     aligned = add_missing_columns(
         aligned,

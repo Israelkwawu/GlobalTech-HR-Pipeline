@@ -100,7 +100,7 @@ outputs/
 Command:
 
 ```bash
-python pipeline.py
+python main.py
 ```
 
 Expected Output

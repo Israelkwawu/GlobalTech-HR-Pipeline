@@ -3,6 +3,7 @@ Unit tests for src.ingest.
 """
 
 from pathlib import Path
+import json
 
 import pandas as pd
 import pytest
@@ -15,8 +16,85 @@ from src.ingest import (
     load_payroll,
 )
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-RAW_DATA = PROJECT_ROOT / "data" / "raw"
+def write_globaltech_csv(path: Path) -> Path:
+    path.write_text(
+        "employee_id,first_name,last_name,email,department,job_title,"
+        "hire_date,country,employment_type,manager_id\n"
+        "1042,Ada,Lovelace,ada@globaltech.test,ENG-01,Engineer,"
+        "2020-01-15,USA,Full-Time,1000\n",
+        encoding="utf-8",
+    )
+    return path
+
+
+def write_acquiredco_json(path: Path) -> Path:
+    payload = {
+        "status": "ok",
+        "timestamp": "2024-01-01T00:00:00",
+        "total_records": 2,
+        "employees": [
+            {
+                "employee_identifier": "10",
+                "name": {"first": "Grace", "last": "Hopper", "full": "Grace Hopper"},
+                "contact": {"email": "grace@acquiredco.test"},
+                "assignment": {
+                    "department": "Engineering",
+                    "role": "Engineer",
+                    "location": "UK",
+                    "hire_timestamp": "06/27/2020",
+                },
+                "employment": {"type": "Full-Time"},
+                "manager_employee_id": None,
+            },
+            {
+                "employee_identifier": "11",
+                "name": {"first": "Alan", "last": "Turing", "full": "Alan Turing"},
+                "contact": {"email": "alan@acquiredco.test"},
+                "assignment": {
+                    "department": "Research",
+                    "role": "Scientist",
+                    "location": "UK",
+                    "hire_timestamp": "01/15/2019",
+                },
+                "employment": {"type": "Full-Time"},
+                "manager_employee_id": "10",
+            },
+        ],
+    }
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    return path
+
+
+def write_payroll_xlsx(path: Path) -> Path:
+    pd.DataFrame(
+        {
+            "employee_id": [1042, 3001],
+            "source": ["GlobalTech", "AcquiredCo"],
+            "base_salary": ["$85,000", "70000"],
+            "currency": ["USD", "EUR"],
+            "pay_frequency": ["Annual", "Monthly"],
+        }
+    ).to_excel(path, index=False)
+    return path
+
+
+def write_benefits_xml(path: Path) -> Path:
+    path.write_text(
+        """
+        <enrollments>
+          <enrollment>
+            <employee_id>1042</employee_id>
+            <plan_type>Medical</plan_type>
+            <coverage_level>Employee</coverage_level>
+            <enrollment_date>15-Jan-2022</enrollment_date>
+            <premium_employee>100</premium_employee>
+            <premium_employer>400</premium_employer>
+          </enrollment>
+        </enrollments>
+        """.strip(),
+        encoding="utf-8",
+    )
+    return path
 
 
 # ==========================================================
@@ -24,8 +102,8 @@ RAW_DATA = PROJECT_ROOT / "data" / "raw"
 # ==========================================================
 
 
-def test_load_globaltech_hris():
-    df = load_globaltech_hris(RAW_DATA / "globaltech_hris.csv")
+def test_load_globaltech_hris(tmp_path):
+    df = load_globaltech_hris(write_globaltech_csv(tmp_path / "globaltech_hris.csv"))
 
     assert isinstance(df, pd.DataFrame)
     assert not df.empty
@@ -52,12 +130,16 @@ def test_globaltech_invalid_extension(tmp_path):
 # ==========================================================
 
 
-def test_load_acquiredco_hris():
-    df = load_acquiredco_hris(RAW_DATA / "acquiredco_api.json")
+def test_load_acquiredco_hris(tmp_path):
+    df = load_acquiredco_hris(
+        write_acquiredco_json(tmp_path / "acquiredco_api.json"),
+        page_size=1,
+    )
 
     assert isinstance(df, pd.DataFrame)
     assert not df.empty
 
+    assert len(df) == 2
     assert "employee_identifier" in df.columns
     assert "name.first" in df.columns
     assert "contact.email" in df.columns
@@ -90,8 +172,8 @@ def test_acquiredco_bad_json(tmp_path):
 # ==========================================================
 
 
-def test_load_payroll():
-    df = load_payroll(RAW_DATA / "payroll_data.xlsx")
+def test_load_payroll(tmp_path):
+    df = load_payroll(write_payroll_xlsx(tmp_path / "payroll_data.xlsx"))
 
     assert isinstance(df, pd.DataFrame)
     assert not df.empty
@@ -117,8 +199,8 @@ def test_payroll_invalid_extension(tmp_path):
 # ==========================================================
 
 
-def test_load_benefits():
-    df = load_benefits(RAW_DATA / "benefits_enrollment.xml")
+def test_load_benefits(tmp_path):
+    df = load_benefits(write_benefits_xml(tmp_path / "benefits_enrollment.xml"))
 
     assert isinstance(df, pd.DataFrame)
     assert not df.empty
@@ -153,8 +235,8 @@ def test_benefits_bad_xml(tmp_path):
 # ==========================================================
 
 
-def test_align_globaltech_schema():
-    df = load_globaltech_hris(RAW_DATA / "globaltech_hris.csv")
+def test_align_globaltech_schema(tmp_path):
+    df = load_globaltech_hris(write_globaltech_csv(tmp_path / "globaltech_hris.csv"))
 
     aligned = align_employee_schema(
         df,
@@ -164,10 +246,13 @@ def test_align_globaltech_schema():
     assert "employee_id" in aligned.columns
     assert "first_name" in aligned.columns
     assert "last_name" in aligned.columns
+    assert aligned.loc[0, "dedup_method"] == "single_source"
+    assert aligned.loc[0, "source_systems"] == "globaltech_hris"
+    assert aligned.loc[0, "company_origin"] == "GlobalTech"
 
 
-def test_align_acquiredco_schema():
-    df = load_acquiredco_hris(RAW_DATA / "acquiredco_api.json")
+def test_align_acquiredco_schema(tmp_path):
+    df = load_acquiredco_hris(write_acquiredco_json(tmp_path / "acquiredco_api.json"))
 
     aligned = align_employee_schema(
         df,
@@ -179,8 +264,8 @@ def test_align_acquiredco_schema():
     assert "last_name" in aligned.columns
 
 
-def test_align_payroll_schema():
-    df = load_payroll(RAW_DATA / "payroll_data.xlsx")
+def test_align_payroll_schema(tmp_path):
+    df = load_payroll(write_payroll_xlsx(tmp_path / "payroll_data.xlsx"))
 
     aligned = align_employee_schema(
         df,
@@ -189,10 +274,12 @@ def test_align_payroll_schema():
 
     assert "salary" in aligned.columns
     assert "currency" in aligned.columns
+    assert set(aligned["company_origin"]) == {"GlobalTech", "AcquiredCo"}
+    assert (aligned["dedup_method"] == "single_source").all()
 
 
-def test_align_benefits_schema():
-    df = load_benefits(RAW_DATA / "benefits_enrollment.xml")
+def test_align_benefits_schema(tmp_path):
+    df = load_benefits(write_benefits_xml(tmp_path / "benefits_enrollment.xml"))
 
     aligned = align_employee_schema(
         df,
@@ -213,8 +300,8 @@ def test_align_unknown_source():
         )
 
 
-def test_aligned_columns_are_unique():
-    df = load_globaltech_hris(RAW_DATA / "globaltech_hris.csv")
+def test_aligned_columns_are_unique(tmp_path):
+    df = load_globaltech_hris(write_globaltech_csv(tmp_path / "globaltech_hris.csv"))
 
     aligned = align_employee_schema(
         df,
@@ -224,8 +311,8 @@ def test_aligned_columns_are_unique():
     assert len(aligned.columns) == len(set(aligned.columns))
 
 
-def test_alignment_returns_dataframe():
-    df = load_globaltech_hris(RAW_DATA / "globaltech_hris.csv")
+def test_alignment_returns_dataframe(tmp_path):
+    df = load_globaltech_hris(write_globaltech_csv(tmp_path / "globaltech_hris.csv"))
 
     aligned = align_employee_schema(
         df,

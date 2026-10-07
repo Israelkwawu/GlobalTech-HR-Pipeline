@@ -115,7 +115,9 @@ def test_missing_column():
 
     result = validator.validate(df)
 
-    assert result.empty
+    assert len(result) == 1
+    assert result.iloc[0]["rule"] == "MISSING_COLUMN"
+    assert result.iloc[0]["column"] == "salary"
 
 
 def test_multiple_invalid_values():

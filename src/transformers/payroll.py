@@ -22,6 +22,7 @@ import pandas as pd
 from config.logging_config import get_logger
 
 
+from src.transformers.employee_id import namespace_employee_ids
 from src.transformers.salary import (
     normalize_salary_columns,
 )
@@ -211,6 +212,12 @@ def normalize_payroll(
     # --------------------------------------------------------
 
     df = normalize_salary_columns(df)
+
+    if "company_origin" not in df.columns:
+        df["company_origin"] = "GlobalTech"
+
+    if "employee_id" in df.columns:
+        df = namespace_employee_ids(df)
 
     # --------------------------------------------------------
     # Validation logging

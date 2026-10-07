@@ -117,6 +117,7 @@ def export_dataframe(
     filename: str | None = None,
     output_dir: Path | str = DEFAULT_OUTPUT_DIR,
     output_path: Path | str | None = None,
+    partition_by: str | None = None,
 ) -> Path:
     """
     Export dataframe as parquet/csv.
@@ -150,7 +151,25 @@ def export_dataframe(
 
     suffix = file_path.suffix.lower()
 
-    if suffix == ".parquet":
+    if partition_by and partition_by in df.columns:
+
+        dataset_path = file_path.with_suffix("") if file_path.suffix else file_path
+
+        df.to_parquet(
+            dataset_path,
+            index=False,
+            engine="pyarrow",
+            partition_cols=[partition_by],
+        )
+
+        logger.info("Partitioned parquet written: %s", dataset_path)
+
+        return dataset_path
+
+    if suffix == ".parquet" or suffix == "":
+
+        if suffix == "":
+            file_path = file_path.with_suffix(".parquet")
 
         df.to_parquet(
             file_path,
@@ -258,6 +277,9 @@ def export_pipeline_results(
         golden_dataset,
         GOLDEN_DATASET_FILENAME,
         output_dir,
+        partition_by=(
+            "company_origin" if "company_origin" in golden_dataset.columns else None
+        ),
     )
 
     # ------------------------------------------------
@@ -328,12 +350,17 @@ def export_pipeline_results(
 def export_dataset(
     df: pd.DataFrame,
     output_path: str | Path,
+    partition_by: str | None = None,
 ) -> Path:
     """
     Export dataset to explicit path.
+
+    partition_by writes a parquet dataset directory, one partition
+    per distinct value. The golden dataset uses company_origin.
     """
 
     return export_dataframe(
         df=df,
         output_path=output_path,
+        partition_by=partition_by,
     )

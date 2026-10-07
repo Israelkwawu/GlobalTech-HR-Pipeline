@@ -74,6 +74,32 @@ def test_best_match():
     assert score > 85
 
 
+def test_fuzzy_match_blocks_on_hire_date():
+
+    left = pd.DataFrame(
+        {
+            "employee_id": ["GT-000001"],
+            "full_name": ["John Smith"],
+            "hire_date": ["2020-01-01"],
+        }
+    )
+
+    right = pd.DataFrame(
+        {
+            "employee_id": ["AC-000002", "AC-000003"],
+            "full_name": ["Jon Smith", "Jon Smith"],
+            "hire_date": ["2020-01-15", "2021-06-01"],
+        }
+    )
+
+    result = fuzzy_match(left, right)
+
+    assert len(result) == 1
+    assert result.iloc[0]["record_2_id"] == "AC-000002"
+    assert result.iloc[0]["hire_date_diff_days"] <= 30
+    assert result.iloc[0]["probable_match"]
+
+
 def test_similarity_with_none():
 
     assert (

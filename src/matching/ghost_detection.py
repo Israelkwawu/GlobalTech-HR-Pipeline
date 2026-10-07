@@ -18,41 +18,55 @@ from datetime import datetime
 
 from config.logging_config import get_logger
 
+from src.transformers.salary import normalize_salary_columns
+
 logger = get_logger(__name__)
-
-
-# ============================================================
-# Normalize IDs
-# ============================================================
-
-
-def normalize_match_id(
-    value,
-):
-    """
-    Convert IDs to comparable numeric values.
-
-    GT-001042 -> 1042
-    AC-001042 -> 1042
-    1042 -> 1042
-    """
-
-    if pd.isna(value):
-        return None
-
-    value = str(value).strip()
-
-    digits = "".join(c for c in value if c.isdigit())
-
-    if not digits:
-        return None
-
-    return int(digits)
 
 
 # ============================================================
 # Payroll Ghost Detection
 # ============================================================
+
+
+def _employee_name(frame: pd.DataFrame) -> pd.Series:
+    """Build a display name from the columns that are present."""
+
+    if "full_name" in frame.columns:
+        return frame["full_name"].astype("string")
+
+    if {"first_name", "last_name"}.issubset(frame.columns):
+        return (
+            frame["first_name"].fillna("").astype(str)
+            + " "
+            + frame["last_name"].fillna("").astype(str)
+        ).str.strip()
+
+    if "name" in frame.columns:
+        return frame["name"].astype("string")
+
+    return pd.Series([pd.NA] * len(frame), index=frame.index)
+
+
+def _with_annual_usd(payroll: pd.DataFrame) -> pd.DataFrame:
+    """
+    Convert payroll salary before ghost reporting.
+
+    Missing currency or frequency defaults to USD and Annual so a raw
+    salary amount is still expressed as salary_usd_annual.
+    """
+
+    payroll = payroll.copy()
+
+    if "salary_usd_annual" in payroll.columns and payroll["salary_usd_annual"].notna().any():
+        return payroll
+
+    if "currency" not in payroll.columns:
+        payroll["currency"] = "USD"
+
+    if "pay_frequency" not in payroll.columns:
+        payroll["pay_frequency"] = "Annual"
+
+    return normalize_salary_columns(payroll)
 
 
 def detect_payroll_ghosts(
@@ -62,63 +76,49 @@ def detect_payroll_ghosts(
     """
     Detect payroll records without HRIS employees.
 
-    Compliance requirement:
+    Comparison uses the namespaced employee id. Stripping the GT/AC
+    prefix would treat GlobalTech 1042 and AcquiredCo 1042 as one person.
 
-    Payroll employee without HRIS record
-    = ghost employee
+    The report is separate from the golden dataset.
     """
 
     logger.info("Starting payroll ghost detection...")
 
     employees = employees.copy()
+    payroll = _with_annual_usd(payroll)
 
-    payroll = payroll.copy()
-
-    # ------------------------------------------
-    # Create matching keys
-    # ------------------------------------------
-
-    employees["match_id"] = employees["employee_id"].apply(normalize_match_id)
-
-    payroll["match_id"] = payroll["employee_id"].apply(normalize_match_id)
-
-    # ------------------------------------------
-    # Find payroll only records
-    # ------------------------------------------
-
-    ghosts = payroll[~payroll["match_id"].isin(employees["match_id"])].copy()
+    employee_ids = set(employees["employee_id"].dropna().astype(str).str.strip())
+    payroll_ids = payroll["employee_id"].astype("string").str.strip()
+    ghosts = payroll.loc[~payroll_ids.isin(employee_ids)].copy()
 
     if ghosts.empty:
 
         logger.info("No payroll ghosts detected.")
 
-        return pd.DataFrame()
+        return pd.DataFrame(
+            columns=[
+                "payroll_employee_id",
+                "name",
+                "salary_usd_annual",
+                "ghost_flag_reason",
+                "ghost_employee",
+                "employee_id",
+            ]
+        )
 
-    # ------------------------------------------
-    # Compliance fields
-    # ------------------------------------------
-
+    ghosts["payroll_employee_id"] = ghosts["employee_id"].astype("string").str.strip()
+    ghosts["name"] = _employee_name(ghosts)
+    ghosts["ghost_flag_reason"] = "Payroll record has no matching HRIS employee"
     ghosts["ghost_employee"] = True
-
-    ghosts["ghost_reason"] = "Payroll record has no matching HRIS employee"
-
     ghosts["detected_at"] = datetime.utcnow()
-
     ghosts["source_system"] = "payroll"
 
-    logger.warning(
-        """
-Payroll ghost employees detected.
+    if "salary_usd_annual" not in ghosts.columns:
+        ghosts["salary_usd_annual"] = pd.NA
 
-Count=%s
-""",
-        len(ghosts),
-    )
+    logger.warning("Payroll ghost employees detected. Count=%s", len(ghosts))
 
-    return ghosts.drop(
-        columns=["match_id"],
-        errors="ignore",
-    )
+    return ghosts.reset_index(drop=True)
 
 
 # ============================================================
@@ -135,11 +135,11 @@ def detect_benefits_ghosts(
 
     benefits = benefits.copy()
 
-    employees["match_id"] = employees["employee_id"].apply(normalize_match_id)
+    employee_ids = set(employees["employee_id"].dropna().astype(str).str.strip())
 
-    benefits["match_id"] = benefits["employee_id"].apply(normalize_match_id)
+    benefit_ids = benefits["employee_id"].astype("string").str.strip()
 
-    ghosts = benefits[~benefits["match_id"].isin(employees["match_id"])].copy()
+    ghosts = benefits.loc[~benefit_ids.isin(employee_ids)].copy()
 
     if ghosts.empty:
 
@@ -147,7 +147,7 @@ def detect_benefits_ghosts(
 
     ghosts["ghost_employee"] = True
 
-    ghosts["ghost_reason"] = "Benefits record has no matching HRIS employee"
+    ghosts["ghost_flag_reason"] = "Benefits record has no matching HRIS employee"
 
     ghosts["detected_at"] = datetime.utcnow()
 

@@ -239,43 +239,31 @@ def normalize_employee_identifiers(
     source: str,
 ) -> pd.DataFrame:
     """
-    Namespace only HRIS employee IDs.
+    Namespace employee IDs for every source.
 
-    HRIS:
-        1 -> GT-000001
-
-    AcquiredCo:
-        1 -> AC-000001
-
-    Payroll:
-        keep original
-
-    Benefits:
-        keep original
+    GlobalTech and payroll or benefits rows for GlobalTech become GT-######.
+    AcquiredCo rows become AC-######. Leaving payroll or benefits ids raw
+    would collide with the other company's number range.
     """
 
     df = df.copy()
 
-    if source in {
-        "globaltech_hris",
-        "acquiredco_hris",
-    } and {
-        "employee_id",
-        "company_origin",
-    }.issubset(df.columns):
+    if not {"employee_id", "company_origin"}.issubset(df.columns):
 
-        logger.info("Namespacing employee IDs...")
+        logger.info("Skipping employee ID namespace for %s", source)
 
-        df = namespace_employee_ids(df)
+        return df
 
-    else:
+    if source == "benefits":
 
-        logger.info(
-            "Skipping employee ID namespace for %s",
-            source,
+        unresolved = ~df["company_origin"].astype(str).str.lower().isin(
+            ["globaltech", "acquiredco"]
         )
+        df.loc[unresolved, "company_origin"] = "GlobalTech"
 
-    return df
+    logger.info("Namespacing employee IDs for %s", source)
+
+    return namespace_employee_ids(df)
 
 
 # ============================================================
