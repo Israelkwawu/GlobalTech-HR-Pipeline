@@ -126,6 +126,9 @@ def annualize_salary(
 # ============================================================
 
 
+_warned_currencies: set[str] = set()
+
+
 def convert_to_usd(
     amount,
     currency,
@@ -139,10 +142,12 @@ def convert_to_usd(
 
     if currency not in CURRENCY_RATES_TO_USD:
 
-        logger.warning(
-            "Unknown currency '%s'. Defaulting rate=1",
-            currency,
-        )
+        if currency not in _warned_currencies:
+            _warned_currencies.add(currency)
+            logger.warning(
+                "Unknown currency '%s'. Defaulting rate=1",
+                currency,
+            )
 
         rate = 1.0
 
@@ -274,22 +279,10 @@ def normalize_salary_columns(
     )
 
     logger.info(
-        """
-SALARY NORMALIZATION COMPLETE
-
-Rows:
-%s
-
-Salary populated:
-%s
-
-USD annual populated:
-%s
-
-""",
+        "Salary normalization rows=%s populated=%s usd_annual=%s",
         len(df),
-        df["salary_numeric"].notna().sum(),
-        df["salary_usd_annual"].notna().sum(),
+        int(df["salary_numeric"].notna().sum()),
+        int(df["salary_usd_annual"].notna().sum()),
     )
 
     return df

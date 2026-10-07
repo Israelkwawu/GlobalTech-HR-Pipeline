@@ -249,12 +249,8 @@ def namespace_employee_ids(
     if dead_letters:
 
         logger.error(
-            """
-Employee ID dead-letter records:
-
-%s
-""",
-            dead_letters,
+            "Employee ID dead-letter records=%s",
+            len(dead_letters),
         )
 
     return df

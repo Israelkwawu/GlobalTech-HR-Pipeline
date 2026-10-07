@@ -27,13 +27,13 @@ Parquet
 | department | string | Standard department taxonomy | Engineering |
 | country | string | Employee jurisdiction | USA |
 | employment_type | string | Employment classification | Full-Time |
-| hire_date | datetime | Employee start date | 2022-01-15 |
-| salary_original | float | Original salary amount | 85000 |
+| hire_date | datetime64[ns] | Employee start date | 2022-01-15 |
+| salary | float | Original salary amount before annualization and currency conversion | 85000 |
 | currency | string | Original salary currency | EUR |
 | salary_usd_annual | float | Normalized annual salary USD | 92000 |
 | manager_id | string | Manager employee ID | GT-000123 |
 | company_origin | string | Original company source | GlobalTech |
-| source_systems | string | Systems contributing records | hris,payroll |
+| source_systems | string | Systems contributing records | globaltech_hris,payroll |
 | dedup_method | string | Match strategy applied | exact_id |
 
 ---

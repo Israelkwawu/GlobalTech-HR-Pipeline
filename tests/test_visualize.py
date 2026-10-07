@@ -15,6 +15,7 @@ from src.visualize import (
     chart_tenure_distribution,
     chart_benefits_rate,
     chart_quality_summary,
+    enrollment_rate_by_department,
     generate_visualizations,
 )
 
@@ -123,6 +124,27 @@ def test_benefits_chart_created(tmp_path):
     )
 
     assert (tmp_path / "05_benefits_enrollment.png").exists()
+
+
+def test_blank_benefit_plans_are_not_enrolled():
+
+    plans_only = pd.DataFrame(
+        {
+            "department": ["Engineering", "Engineering", "Finance"],
+            "benefit_plans": ["Medical", "", None],
+        }
+    )
+
+    rates = enrollment_rate_by_department(plans_only, limit=10)
+
+    assert rates.loc["Engineering"] == 50
+    assert rates.loc["Finance"] == 0
+
+    matched = plans_only.assign(benefits_matched=[True, False, False])
+    matched_rates = enrollment_rate_by_department(matched, limit=10)
+
+    assert matched_rates.loc["Engineering"] == 50
+    assert matched_rates.loc["Finance"] == 0
 
 
 def test_quality_summary_chart_created(tmp_path):

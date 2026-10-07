@@ -269,6 +269,8 @@ def merge_benefits(
         ),
     )
 
+    aggregated["benefits_matched"] = True
+
     logger.info(
         "Benefit employees aggregated=%s",
         len(aggregated),
@@ -296,6 +298,43 @@ def merge_benefits(
     result["total_employer_premium"] = result["total_employer_premium"].fillna(0)
 
     result["benefit_plans"] = result["benefit_plans"].fillna("")
+
+    if "source_systems" not in result.columns:
+
+        result["source_systems"] = ""
+
+    if "dedup_method" not in result.columns:
+
+        result["dedup_method"] = "single_source"
+
+    if "benefits_matched" not in result.columns:
+
+        result["benefits_matched"] = False
+
+    enrolled = result["benefits_matched"].fillna(False).astype(bool)
+
+    def _append_benefits(value: str) -> str:
+
+        parts = [
+            part for part in str(value).split(",") if part and part not in {"nan", "None"}
+        ]
+
+        if "benefits" not in parts:
+
+            parts.append("benefits")
+
+        return ",".join(parts)
+
+    result.loc[enrolled, "source_systems"] = result.loc[enrolled, "source_systems"].map(
+        _append_benefits
+    )
+
+    current_method = result.loc[enrolled, "dedup_method"].fillna("single_source")
+
+    result.loc[enrolled, "dedup_method"] = current_method.where(
+        current_method.ne("single_source"),
+        "exact_id",
+    )
 
     # Final safety
 

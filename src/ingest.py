@@ -310,29 +310,36 @@ def load_acquiredco_hris(
 
         total_records = len(records)
 
+        if page_size < 1:
+            raise ValueError("page_size must be at least 1")
+
         logger.info(
             "Beginning paginated ingestion (%s records, page size=%s)",
             total_records,
             page_size,
         )
 
-        for page_number, start in enumerate(
-            range(0, total_records, page_size),
-            start=1,
-        ):
+        page_frames = []
+
+        for start in range(0, total_records, page_size):
             end = min(start + page_size, total_records)
+            page_records = records[start:end]
 
-            logger.info(
-                "Fetched page %s (%s records)",
-                page_number,
-                end - start,
-            )
+            if page_records:
+                page_frames.append(pd.json_normalize(page_records))
 
-        # ------------------------------------------------------------------
-        # Flatten nested JSON
-        # ------------------------------------------------------------------
+        df = (
+            pd.concat(page_frames, ignore_index=True)
+            if page_frames
+            else pd.DataFrame()
+        )
 
-        df = pd.json_normalize(records)
+        logger.info(
+            "AcquiredCo pages=%s records=%s page_size=%s",
+            len(page_frames),
+            len(df),
+            page_size,
+        )
 
         # ------------------------------------------------------------------
         # Basic standardization
@@ -643,19 +650,7 @@ def load_payroll(
             engine="openpyxl",
         )
 
-        logger.info(
-            """
-========== RAW PAYROLL ==========
-Rows:
-%s
-
-Columns:
-%s
-=================================
-""",
-            len(df),
-            list(df.columns),
-        )
+        logger.info("Payroll rows=%s", len(df))
 
         # ==================================================
         # Normalize columns
@@ -707,14 +702,9 @@ Columns:
 
             if not found_company:
 
-                logger.warning("""
-Payroll file has no company information.
-
-Defaulting company_origin=GlobalTech.
-
-If AcquiredCo payroll exists,
-provide company_origin column.
-""")
+                logger.warning(
+                    "Payroll file has no company information. Defaulting company_origin=GlobalTech"
+                )
 
                 df["company_origin"] = "GlobalTech"
 
@@ -796,55 +786,9 @@ Payroll file missing employee_id column
         ).sum()
 
         logger.info(
-            """
-========== PAYROLL SUMMARY ==========
-
-Rows:
-%s
-
-Unique employees:
-%s
-
-Duplicate IDs:
-%s
-
-
-Company distribution:
-
-%s
-
-=====================================
-""",
-            len(df),
+            "Payroll unique_ids=%s duplicate_rows=%s",
             df["employee_id"].nunique(),
-            duplicate_ids,
-            df["company_origin"].value_counts().to_string(),
-        )
-
-        # ==================================================
-        # Salary diagnostics
-        # ==================================================
-
-        salary_columns = [
-            c
-            for c in [
-                "employee_id",
-                "company_origin",
-                "salary",
-                "currency",
-                "pay_frequency",
-            ]
-            if c in df.columns
-        ]
-
-        logger.info(
-            """
-PAYROLL SAMPLE
-
-%s
-
-""",
-            df[salary_columns].head(10).to_string(),
+            int(duplicate_ids),
         )
 
         # ==================================================
@@ -1015,14 +959,39 @@ def align_employee_schema(
         df[list(available_columns.keys())].rename(columns=available_columns).copy()
     )
 
-    aligned["source_system"] = source_system
-
-    aligned["company_origin"] = {
+    company_defaults = {
         "globaltech_hris": "GlobalTech",
         "acquiredco_hris": "AcquiredCo",
-        "payroll": "Payroll",
-        "benefits": "Benefits",
-    }.get(source_system, "Unknown")
+        "payroll": "GlobalTech",
+        "benefits": "GlobalTech",
+    }
+    default_company = company_defaults.get(source_system, "Unknown")
+
+    aligned["source_system"] = source_system
+    aligned["source_systems"] = source_system
+    aligned["dedup_method"] = "single_source"
+
+    if "company_origin" not in aligned.columns:
+        aligned["company_origin"] = default_company
+    else:
+        aligned["company_origin"] = (
+            aligned["company_origin"]
+            .astype("string")
+            .str.strip()
+            .replace(
+                {
+                    "globaltech": "GlobalTech",
+                    "Global Tech": "GlobalTech",
+                    "GLOBALTECH": "GlobalTech",
+                    "acquiredco": "AcquiredCo",
+                    "Acquired Co": "AcquiredCo",
+                    "ACQUIREDCO": "AcquiredCo",
+                    "Payroll": pd.NA,
+                    "Benefits": pd.NA,
+                }
+            )
+            .fillna(default_company)
+        )
 
     aligned = add_missing_columns(
         aligned,

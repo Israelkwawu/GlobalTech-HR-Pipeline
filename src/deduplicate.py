@@ -23,14 +23,12 @@ from config.logging_config import get_logger
 
 
 from src.matching.exact_match import exact_employee_match
-from src.matching.email_match import email_match
 from src.matching.fuzzy_match import fuzzy_match
 
 
 from src.matching.ghost_detection import (
-    detect_payroll_ghosts,
     detect_benefits_ghosts,
-    combine_ghost_reports,
+    detect_payroll_ghosts,
 )
 
 
@@ -219,6 +217,30 @@ def _prepare_source(
 # ============================================================
 
 
+def _ensure_row_provenance(df: pd.DataFrame, default_source: str) -> pd.DataFrame:
+    """
+    Keep the source already stored on each row.
+
+    A combined HRIS frame contains both GlobalTech and AcquiredCo.
+    Stamping every row with one source would erase that distinction.
+    """
+
+    df = df.copy()
+
+    if "source_systems" not in df.columns or df["source_systems"].fillna("").eq("").all():
+        if "source_system" in df.columns:
+            df["source_systems"] = df["source_system"].fillna(default_source)
+        else:
+            df["source_systems"] = default_source
+
+    if "dedup_method" not in df.columns:
+        df["dedup_method"] = "single_source"
+    else:
+        df["dedup_method"] = df["dedup_method"].fillna("single_source")
+
+    return df
+
+
 def _add_provenance(
     df,
     source,
@@ -244,49 +266,226 @@ def _add_provenance(
 
 
 # ============================================================
-# Deduplicate Master
+# Source priority
 # ============================================================
 
 
-def _deduplicate_master(
-    df,
-):
+_SOURCE_RANK = {
+    "globaltech_hris": 0,
+    "acquiredco_hris": 0,
+    "payroll": 1,
+    "benefits": 2,
+}
+
+
+def _source_rank(value) -> int:
+    """Lower rank wins. HRIS outranks payroll, which outranks benefits."""
+
+    if pd.isna(value):
+        return 99
+
+    ranks = [
+        _SOURCE_RANK[part.strip()]
+        for part in str(value).split(",")
+        if part.strip() in _SOURCE_RANK
+    ]
+
+    return min(ranks) if ranks else 99
+
+
+def _union_sources(values) -> str:
+    parts: list[str] = []
+
+    for value in values:
+        if pd.isna(value):
+            continue
+
+        for part in str(value).split(","):
+            part = part.strip()
+
+            if part and part not in {"nan", "None"} and part not in parts:
+                parts.append(part)
+
+    return ",".join(parts)
+
+
+def _is_blank(value) -> bool:
+    if pd.isna(value):
+        return True
+
+    return str(value).strip().lower() in {"", "nan", "none", "<na>"}
+
+
+def _collapse_group(
+    group: pd.DataFrame,
+    method: str | None,
+) -> pd.Series:
+    """
+    Keep the highest-priority row and fill gaps from the rest.
+
+    HRIS identity wins over payroll and benefits. GlobalTech wins a
+    tie between the two HRIS systems because payroll migration targets
+    the GlobalTech platform.
+    """
+
+    ranked = group.copy()
+    ranked["_priority"] = ranked.get(
+        "source_systems",
+        pd.Series("", index=ranked.index),
+    ).map(_source_rank)
+
+    if "company_origin" in ranked.columns:
+        ranked["_origin_rank"] = (
+            ranked["company_origin"]
+            .map({"GlobalTech": 0, "AcquiredCo": 1})
+            .fillna(2)
+        )
+    else:
+        ranked["_origin_rank"] = 0
+
+    ranked["_missing"] = ranked.isna().sum(axis=1)
+    ranked = ranked.sort_values(["_priority", "_origin_rank", "_missing"])
+    survivor = ranked.iloc[0].copy()
+
+    for _, row in ranked.iloc[1:].iterrows():
+        for column in ranked.columns:
+            if str(column).startswith("_"):
+                continue
+
+            if column in {"source_systems", "dedup_method"}:
+                continue
+
+            if _is_blank(survivor[column]) and not _is_blank(row[column]):
+                survivor[column] = row[column]
+
+    if "source_systems" in ranked.columns:
+        survivor["source_systems"] = _union_sources(ranked["source_systems"])
+
+    if method and len(ranked) > 1:
+        survivor["dedup_method"] = method
+
+    return survivor.drop(labels=[c for c in survivor.index if str(c).startswith("_")])
+
+
+def _collapse_by_employee_id(df: pd.DataFrame) -> pd.DataFrame:
+    """Pass 1. Same namespaced id is one employee. HRIS fields survive."""
+
+    if df.empty or "employee_id" not in df.columns:
+        return df
 
     before = len(df)
+    collapsed = [
+        _collapse_group(group, "exact_id" if len(group) > 1 else None)
+        for _, group in df.groupby("employee_id", dropna=False, sort=False)
+    ]
+    result = pd.DataFrame(collapsed).reset_index(drop=True)
 
-    duplicates = df.duplicated(
-        subset=["employee_id"],
-        keep=False,
+    logger.info("Exact-id rows before=%s after=%s", before, len(result))
+
+    return result
+
+
+def _email_key(series: pd.Series) -> pd.Series:
+    key = series.astype("string").str.strip().str.lower()
+    return key.mask(key.isin(["", "nan", "none", "<na>", "nat"]))
+
+
+def _collapse_cross_company_email(
+    df: pd.DataFrame,
+) -> tuple[pd.DataFrame, pd.DataFrame, dict[str, str]]:
+    """
+    Pass 2. The same email at GlobalTech and AcquiredCo is one person.
+
+    The GlobalTech id is kept. The AcquiredCo id is remapped so later
+    payroll and benefits rows still attach to the surviving employee.
+    """
+
+    empty_matches = pd.DataFrame(
+        columns=["email", "record_1_id", "record_2_id", "match_method"]
     )
 
-    count = int(duplicates.sum())
+    if df.empty or "email" not in df.columns:
+        return df, empty_matches, {}
 
-    if count:
+    work = df.copy()
+    work["_email_key"] = _email_key(work["email"])
+    kept = [work[work["_email_key"].isna()]]
+    matches = []
+    alias: dict[str, str] = {}
 
-        logger.warning(
-            """
-Employee duplicates detected.
+    keyed = work.dropna(subset=["_email_key"])
 
-Rows:
-%s
+    for email, group in keyed.groupby("_email_key", sort=False):
+        origins = set(group.get("company_origin", pd.Series(dtype=str)).astype(str))
+        cross_company = "GlobalTech" in origins and "AcquiredCo" in origins
 
-Resolving by employee namespace.
-""",
-            count,
-        )
+        if len(group) > 1 and cross_company:
+            survivor = _collapse_group(group.drop(columns=["_email_key"]), "email_match")
+            survivor_id = str(survivor["employee_id"])
 
-        df = df.sort_values(by=["employee_id"]).drop_duplicates(
-            subset=["employee_id"],
-            keep="first",
-        )
+            for employee_id in group["employee_id"].dropna().astype(str):
+                if employee_id != survivor_id:
+                    alias[employee_id] = survivor_id
 
-    logger.info(
-        "Employee rows before=%s after=%s",
-        before,
-        len(df),
-    )
+            ids = [str(value) for value in group["employee_id"].dropna().tolist()]
 
+            if len(ids) >= 2:
+                matches.append(
+                    {
+                        "email": email,
+                        "record_1_id": ids[0],
+                        "record_2_id": ids[1],
+                        "match_method": "email_match",
+                    }
+                )
+
+            kept.append(pd.DataFrame([survivor]))
+        else:
+            kept.append(group.drop(columns=["_email_key"]))
+
+    result = pd.concat(kept, ignore_index=True) if kept else df.iloc[0:0]
+
+    if "_email_key" in result.columns:
+        result = result.drop(columns=["_email_key"])
+
+    match_frame = pd.DataFrame(matches) if matches else empty_matches
+
+    logger.info("Cross-company email collapses=%s", len(match_frame))
+
+    return result.reset_index(drop=True), match_frame, alias
+
+
+def _apply_id_alias(df: pd.DataFrame, alias: dict[str, str]) -> pd.DataFrame:
+    if df.empty or not alias or "employee_id" not in df.columns:
+        return df
+
+    df = df.copy()
+    df["employee_id"] = df["employee_id"].astype("string").replace(alias)
     return df
+
+
+def _flag_probable_matches(
+    golden: pd.DataFrame,
+    review: pd.DataFrame,
+) -> pd.DataFrame:
+    """Pass 3 flags pairs for HR. It does not merge them."""
+
+    golden = golden.copy()
+    golden["probable_match"] = False
+
+    if review.empty:
+        return golden
+
+    flagged = set(review["record_1_id"].dropna().astype(str)) | set(
+        review["record_2_id"].dropna().astype(str)
+    )
+    mask = golden["employee_id"].astype(str).isin(flagged)
+    golden.loc[mask, "probable_match"] = True
+
+    method = golden["dedup_method"].fillna("single_source")
+    golden.loc[mask, "dedup_method"] = method.where(method.ne("single_source"), "fuzzy_name")
+
+    return golden
 
 
 # ============================================================
@@ -300,7 +499,7 @@ def deduplicate_employees(
     benefits_df,
 ):
 
-    logger.info("===== DEDUPLICATION START =====")
+    logger.info("Deduplication start")
 
     employees = _prepare_source(
         employee_df,
@@ -317,34 +516,12 @@ def deduplicate_employees(
         "benefits",
     )
 
-    employees = _add_provenance(
-        employees,
-        "globaltech_hris",
-    )
-
-    payroll = _add_provenance(
-        payroll,
-        "payroll",
-    )
-
-    benefits = _add_provenance(
-        benefits,
-        "benefits",
-    )
+    employees = _ensure_row_provenance(employees, "globaltech_hris")
+    payroll = _ensure_row_provenance(payroll, "payroll")
+    benefits = _ensure_row_provenance(benefits, "benefits")
 
     logger.info(
-        """
-SOURCE COUNTS
-
-Employees:
-%s
-
-Payroll:
-%s
-
-Benefits:
-%s
-""",
+        "Dedup sources employees=%s payroll=%s benefits=%s",
         len(employees),
         len(payroll),
         len(benefits),
@@ -352,8 +529,10 @@ Benefits:
 
     # --------------------------------------------------------
     # PASS 1
-    # Exact ID match
+    # Exact ID match, HRIS > Payroll > Benefits
     # --------------------------------------------------------
+
+    employees = _collapse_by_employee_id(employees)
 
     exact_matches = exact_employee_match(
         employees,
@@ -362,26 +541,18 @@ Benefits:
 
     # --------------------------------------------------------
     # PASS 2
-    # Email match
+    # Cross-company email match, applied to the golden population
     # --------------------------------------------------------
 
-    email_matches = email_match(
-        employees,
-        payroll,
-    )
+    employees, email_matches, id_alias = _collapse_cross_company_email(employees)
 
-    # --------------------------------------------------------
-    # PASS 3
-    # Fuzzy match
-    # --------------------------------------------------------
-
-    fuzzy_matches = fuzzy_match(
-        employees,
-        payroll,
-    )
+    payroll = _apply_id_alias(payroll, id_alias)
+    benefits = _apply_id_alias(benefits, id_alias)
 
     # --------------------------------------------------------
     # Ghost employees
+    # Salary is converted inside detection, and ghosts stay
+    # out of the golden dataset.
     # --------------------------------------------------------
 
     payroll_ghosts = detect_payroll_ghosts(
@@ -394,16 +565,17 @@ Benefits:
         benefits,
     )
 
-    ghosts = combine_ghost_reports(
-        payroll_ghosts,
-        benefits_ghosts,
-    )
+    if not benefits_ghosts.empty:
+        logger.warning(
+            "Benefits rows with no HRIS match=%s. They stay out of the payroll ghost report.",
+            len(benefits_ghosts),
+        )
+
+    ghosts = payroll_ghosts
 
     # --------------------------------------------------------
-    # Build golden employee
+    # Enrich, then collapse any remaining exact ids
     # --------------------------------------------------------
-
-    employees = _deduplicate_master(employees)
 
     golden_dataset = merge_payroll(
         employees,
@@ -415,7 +587,22 @@ Benefits:
         benefits,
     )
 
-    golden_dataset = _deduplicate_master(golden_dataset)
+    golden_dataset = _collapse_by_employee_id(golden_dataset)
+
+    # --------------------------------------------------------
+    # PASS 3
+    # Fuzzy name + hire date. Flag only. Do not merge.
+    # --------------------------------------------------------
+
+    fuzzy_matches = fuzzy_match(
+        golden_dataset,
+        golden_dataset,
+    )
+
+    golden_dataset = _flag_probable_matches(
+        golden_dataset,
+        fuzzy_matches,
+    )
 
     duplicate_ids = golden_dataset["employee_id"].duplicated().sum()
 
@@ -423,28 +610,17 @@ Benefits:
 
         raise RuntimeError(f"Golden dataset duplicate IDs={duplicate_ids}")
 
+    salary_populated = (
+        int(golden_dataset["salary"].notna().sum())
+        if "salary" in golden_dataset.columns
+        else 0
+    )
+
     logger.info(
-        """
-===== GOLDEN DATASET READY =====
-
-Rows:
-%s
-
-Unique employees:
-%s
-
-Salary populated:
-%s
-
-================================
-""",
+        "Golden dataset ready rows=%s unique=%s salary=%s",
         len(golden_dataset),
         golden_dataset["employee_id"].nunique(),
-        (
-            golden_dataset["salary"].notna().sum()
-            if "salary" in golden_dataset.columns
-            else 0
-        ),
+        salary_populated,
     )
 
     return {

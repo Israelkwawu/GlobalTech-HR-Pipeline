@@ -28,6 +28,12 @@ from config.logging_config import get_logger
 
 from config import validation_rules as rules
 
+from src.validators.null_validator import NullValidator
+from src.validators.range_validator import RangeValidator
+from src.validators.referential_validator import ReferentialValidator
+from src.validators.regex_validator import RegexValidator
+from src.validators.uniqueness_validator import UniquenessValidator
+
 logger = get_logger(__name__)
 
 
@@ -115,16 +121,12 @@ class DataQualityValidator:
             errors,
         )
 
-        logger.error(
-            """
-========== VALIDATION ERRORS ==========
-
-%s
-
-========================================
-""",
-            ("\n".join(map(str, self.errors)) if self.errors else "No errors"),
-        )
+        if self.errors:
+            logger.warning(
+                "Validation failures=%s. Row detail is in %s",
+                len(self.errors),
+                self.output_dir / "validation_errors.csv",
+            )
 
         self._pipeline_gate(summary)
 
@@ -206,30 +208,45 @@ class DataQualityValidator:
         Check required columns are populated.
         """
 
+        validator = NullValidator(list(rules.REQUIRED_FIELDS))
+        findings = validator.validate(self.df)
+
         for column in rules.REQUIRED_FIELDS:
+
+            check = f"{column}_not_null"
 
             if column not in self.df.columns:
 
-                self._record_result(
-                    f"{column}_not_null",
+                self._record_missing_column(
+                    check,
                     f"{column} must exist and not be null",
-                    0,
-                    0,
-                    0,
                 )
 
                 continue
 
-            total = len(self.df)
+            if findings.empty or "column" not in findings.columns:
 
-            failed_rows = self.df[
-                self.df[column].isna()
-                | (self.df[column].astype(str).str.strip().eq(""))
-            ]
+                failed_rows = self.df.iloc[0:0]
+
+            else:
+
+                failed_ids = findings.loc[
+                    findings["column"] == column,
+                    "employee_id",
+                ]
+
+                failed_rows = self.df[self.df["employee_id"].isin(failed_ids)]
+
+                if failed_rows.empty and not findings.loc[findings["column"] == column].empty:
+
+                    failed_rows = self.df[
+                        self.df[column].isna()
+                        | self.df[column].astype(str).str.strip().eq("")
+                    ]
 
             self._add_errors(
                 failed_rows,
-                f"{column}_not_null",
+                check,
                 column,
                 f"{column} cannot be null",
             )
@@ -237,10 +254,10 @@ class DataQualityValidator:
             failed = len(failed_rows)
 
             self._record_result(
-                f"{column}_not_null",
+                check,
                 f"{column} must not be null",
-                total,
-                total - failed,
+                len(self.df),
+                len(self.df) - failed,
                 failed,
             )
 
@@ -263,35 +280,25 @@ class DataQualityValidator:
         is not considered a duplicate.
         """
 
+        uniqueness = UniquenessValidator(list(rules.UNIQUE_FIELDS))
+        uniqueness.validate(self.df)
+
         for column in rules.UNIQUE_FIELDS:
 
             if column not in self.df.columns:
 
-                continue
-
-            values = self.df[column].dropna()
-
-            if values.empty:
-
-                self._record_result(
+                self._record_missing_column(
                     f"{column}_unique",
-                    f"{column} must be unique",
-                    len(self.df),
-                    len(self.df),
-                    0,
+                    f"{column} must exist and be unique",
                 )
 
                 continue
 
-            duplicates = self.df[column].duplicated(keep=False)
+            populated = self.df[column].notna() & (
+                self.df[column].astype(str).str.strip().ne("")
+            )
 
-            # Ignore empty values
-
-            if column in {
-                "email",
-            }:
-
-                duplicates = duplicates & self.df[column].notna()
+            duplicates = self.df[column].duplicated(keep=False) & populated
 
             failed_rows = self.df[duplicates]
 
@@ -339,6 +346,11 @@ class DataQualityValidator:
         for column, allowed in checks.items():
 
             if column not in self.df.columns:
+
+                self._record_missing_column(
+                    f"{column}_values",
+                    f"{column} must exist and be in the allowed set",
+                )
 
                 continue
 
@@ -396,16 +408,27 @@ class DataQualityValidator:
         for column, pattern in rules.REGEX_RULES.items():
 
             if column not in self.df.columns:
+
+                self._record_missing_column(
+                    f"{column}_regex",
+                    f"{column} must exist and match the required format",
+                )
+
                 continue
 
-            values = self.df[column].astype("string")
+            findings = RegexValidator({column: pattern}).validate(self.df)
 
-            invalid = ~values.str.match(
-                pattern,
-                na=False,
-            )
+            if findings.empty or "value" not in findings.columns:
 
-            failed_rows = self.df[invalid]
+                failed_rows = self.df.iloc[0:0]
+
+            else:
+
+                failed_values = set(findings["value"].dropna().astype(str))
+
+                failed_rows = self.df[
+                    self.df[column].astype("string").isin(failed_values)
+                ]
 
             self._add_errors(
                 failed_rows,
@@ -455,10 +478,18 @@ class DataQualityValidator:
 
         if column not in self.df.columns:
 
-            logger.warning(
-                "Salary validation skipped. Missing column=%s",
+            RangeValidator(
                 column,
+                rules.NUMERIC_RANGES[column]["minimum"],
+                rules.NUMERIC_RANGES[column]["maximum"],
+            ).validate(self.df)
+
+            self._record_missing_column(
+                "salary_range",
+                "salary_usd_annual must exist before range checks",
             )
+
+            logger.error("Salary validation failed. Missing column=%s", column)
 
             return
 
@@ -484,6 +515,12 @@ class DataQualityValidator:
         minimum_salary = rules.NUMERIC_RANGES[column]["minimum"]
 
         maximum_salary = rules.NUMERIC_RANGES[column]["maximum"]
+
+        RangeValidator(
+            column,
+            minimum_salary,
+            maximum_salary,
+        ).validate(self.df)
 
         invalid = has_salary & ((values < minimum_salary) | (values > maximum_salary))
 
@@ -515,28 +552,7 @@ class DataQualityValidator:
         missing_salary_count = int((~has_salary).sum())
 
         logger.info(
-            """
-========== SALARY VALIDATION ==========
-
-Total employees:
-%s
-
-Employees with payroll salary:
-%s
-
-Employees without payroll salary:
-%s
-
-Salary validation failures:
-%s
-
-Allowed range:
-%s - %s
-
-======================================
-
-""",
-            len(self.df),
+            "Salary check populated=%s missing=%s failed=%s range=%s-%s",
             validated_records,
             missing_salary_count,
             failed,
@@ -562,23 +578,38 @@ Allowed range:
         column = "hire_date"
 
         if column not in self.df.columns:
+
+            self._record_missing_column(
+                "hire_date_range",
+                "hire_date must exist and fall between 1970-01-01 and today",
+            )
+
             return
 
+        raw = self.df[column]
         dates = pd.to_datetime(
-            self.df[column],
+            raw,
             errors="coerce",
+            format="mixed",
         )
+
+        text = raw.astype("string").str.strip()
+        present = text.notna() & ~text.str.lower().isin(["", "nat", "none", "nan", "<na>"])
 
         config = rules.DATE_RANGES.get(column)
 
         if not config:
             return
 
-        minimum = pd.Timestamp(config["minimum"])
+        minimum = pd.Timestamp(config["minimum"]).normalize()
 
-        maximum = pd.Timestamp(config["maximum"])
+        maximum = pd.Timestamp(config["maximum"]).normalize()
 
-        invalid = dates.notna() & ((dates < minimum) | (dates > maximum))
+        dates = dates.dt.normalize()
+
+        invalid = (present & dates.isna()) | (
+            dates.notna() & ((dates < minimum) | (dates > maximum))
+        )
 
         failed_rows = self.df[invalid]
 
@@ -600,21 +631,7 @@ Allowed range:
         )
 
         logger.info(
-            """
-    ========== HIRE DATE VALIDATION ==========
-
-    Total employees:
-    %s
-
-    Missing hire dates:
-    %s
-
-    Invalid hire dates:
-    %s
-
-    ==========================================
-    """,
-            len(self.df),
+            "Hire date check missing=%s invalid=%s",
             int(dates.isna().sum()),
             failed,
         )
@@ -646,21 +663,31 @@ Allowed range:
             GT-000010 must exist
         """
 
+        findings = ReferentialValidator(
+            "manager_id",
+            "employee_id",
+        ).validate(self.df)
+
         if "manager_id" not in self.df.columns or "employee_id" not in self.df.columns:
+
+            self._record_missing_column(
+                "manager_reference",
+                "manager_id and employee_id must exist for referential checks",
+            )
 
             return
 
-        valid_employee_ids = set(
-            self.df["employee_id"].dropna().astype(str).str.strip()
-        )
+        if findings.empty or "value" not in findings.columns:
 
-        managers = self.df["manager_id"].dropna().astype(str).str.strip()
+            failed_rows = self.df.iloc[0:0]
 
-        invalid_manager_ids = managers[~managers.isin(valid_employee_ids)]
+        else:
 
-        failed_rows = self.df[
-            self.df["manager_id"].astype("string").isin(invalid_manager_ids)
-        ]
+            invalid_manager_ids = set(findings["value"].dropna().astype(str).str.strip())
+
+            failed_rows = self.df[
+                self.df["manager_id"].astype("string").str.strip().isin(invalid_manager_ids)
+            ]
 
         self._add_errors(
             failed_rows,
@@ -695,14 +722,12 @@ Allowed range:
         Store validation result.
         """
 
-        pass_rate = (
-            round(
-                passed / total * 100,
-                2,
-            )
-            if total
-            else 100
-        )
+        if total:
+            pass_rate = round(passed / total * 100, 2)
+        elif failed:
+            pass_rate = 0.0
+        else:
+            pass_rate = 100.0
 
         self.results.append(
             {
@@ -712,8 +737,30 @@ Allowed range:
                 "passed": passed,
                 "failed": failed,
                 "pass_rate": pass_rate,
-                "status": "PASS" if failed == 0 else "FAIL",
+                "status": "FAIL" if failed else "PASS",
             }
+        )
+
+    def _record_missing_column(
+        self,
+        check: str,
+        description: str,
+    ):
+        """
+        A check cannot pass when the column it guards is absent.
+
+        Empty frames still fail the check so a missing critical field
+        is never reported as a 100% pass.
+        """
+
+        total = max(len(self.df), 1)
+
+        self._record_result(
+            check,
+            description,
+            total,
+            0,
+            total,
         )
 
     def _add_errors(
@@ -798,15 +845,9 @@ Allowed range:
             else 0
         )
 
-        pipeline_passed = failed_checks <= getattr(
-            rules,
-            "MAX_FAILED_CHECKS",
-            0,
-        ) and failure_rate <= getattr(
-            rules,
-            "MAX_FAILURE_RATE",
-            0,
-        )
+        # The delivery gate counts failed checks, not the row failure rate.
+        # The pipeline halts only when more than MAX_FAILED_CHECKS fail.
+        pipeline_passed = failed_checks <= rules.MAX_FAILED_CHECKS
 
         return {
             # Timestamp
@@ -841,32 +882,9 @@ Allowed range:
         if not summary["pipeline_passed"]:
 
             logger.critical(
-                "Pipeline blocked. " "Failed checks=%s Failure rate=%s%%",
+                "Pipeline blocked. Failed checks=%s. See %s",
                 summary["failed_checks"],
-                summary["failure_rate"],
-            )
-
-            logger.error(
-                """
-========== VALIDATION ERRORS ==========
-
-%s
-
-========================================
-""",
-                self.errors,
-            )
-
-            logger.error(
-                """
-========== QUALITY GATE FAILURE ==========
-
-Summary:
-%s
-
-==========================================
-""",
-                summary,
+                self.output_dir / "validation_report.csv",
             )
 
             raise RuntimeError("Data quality gate failed")

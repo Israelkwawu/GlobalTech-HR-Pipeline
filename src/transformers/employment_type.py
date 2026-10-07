@@ -110,8 +110,8 @@ def normalize_employment_type(
     )
 
     logger.info(
-        "Employment type distribution:\n%s",
-        df["employment_type"].value_counts().to_string(),
+        "Employment types=%s",
+        df["employment_type"].value_counts().to_dict(),
     )
 
     return df

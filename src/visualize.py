@@ -45,10 +45,52 @@ COLORBLIND_SAFE_PALETTE = [
     "#D55E00",
 ]
 
+PASSED_COLOR = COLORBLIND_SAFE_PALETTE[2]
+FAILED_COLOR = COLORBLIND_SAFE_PALETTE[5]
+SERIES_COLOR = COLORBLIND_SAFE_PALETTE[0]
+
 
 # ============================================================================
 # Helpers
 # ============================================================================
+
+
+def _blank_text(values: pd.Series) -> pd.Series:
+    text = values.astype("string").str.strip()
+    return text.isna() | text.str.lower().isin(["", "none", "nan", "<na>"])
+
+
+def enrollment_flag(df: pd.DataFrame) -> pd.Series:
+    """True for a benefits match, or a plan name that is not blank."""
+
+    if "benefits_matched" in df.columns:
+        return df["benefits_matched"].fillna(False).astype(bool)
+
+    return ~_blank_text(df["benefit_plans"])
+
+
+def enrollment_rate_by_department(
+    df: pd.DataFrame,
+    limit: int,
+) -> pd.Series:
+    return (
+        enrollment_flag(df)
+        .groupby(df["department"], dropna=False)
+        .mean()
+        .mul(100)
+        .sort_values(ascending=False)
+        .head(limit)
+    )
+
+
+def paint_boxplot(box) -> None:
+    for index, artist in enumerate(box["boxes"]):
+        color = COLORBLIND_SAFE_PALETTE[index % len(COLORBLIND_SAFE_PALETTE)]
+        artist.set_facecolor(color)
+        artist.set_edgecolor(color)
+
+    for artist in box["medians"]:
+        artist.set_color("#000000")
 
 
 def annotate_source(ax):
@@ -168,6 +210,7 @@ def chart_department_headcount(
     ax.barh(
         data.index,
         data.values,
+        color=SERIES_COLOR,
     )
 
     ax.set_title("Headcount by Department")
@@ -213,9 +256,12 @@ def chart_country_headcount(
     ax.bar(
         data.index,
         data.values,
+        color=SERIES_COLOR,
     )
 
     ax.set_title("Headcount by Country")
+
+    ax.set_xlabel("Country")
 
     ax.set_ylabel("Employees")
 
@@ -292,11 +338,14 @@ def chart_salary_distribution(
 
     fig, ax = plt.subplots(figsize=(11, 7))
 
-    ax.boxplot(
+    box = ax.boxplot(
         groups,
         tick_labels=labels,
         showmeans=True,
+        patch_artist=True,
     )
+
+    paint_boxplot(box)
 
     ax.set_title("Salary Distribution by Employment Type")
 
@@ -385,6 +434,7 @@ def chart_tenure_distribution(
     ax.hist(
         tenure,
         bins=20,
+        color=SERIES_COLOR,
     )
 
     ax.set_title("Tenure Distribution")
@@ -414,21 +464,13 @@ def chart_benefits_rate(
     Generate benefits enrollment rate by department.
     """
 
-    required = {
-        "benefit_plans",
-        "department",
-    }
-
-    if not required.issubset(df.columns):
+    if "department" not in df.columns or (
+        "benefit_plans" not in df.columns and "benefits_matched" not in df.columns
+    ):
         logger.warning("Benefits chart skipped. Missing required columns.")
         return
 
-    enrollment = (
-        df.groupby("department")["benefit_plans"]
-        .apply(lambda x: x.notna().mean() * 100)
-        .sort_values(ascending=False)
-        .head(15)
-    )
+    enrollment = enrollment_rate_by_department(df, limit=15)
 
     if enrollment.empty:
         return
@@ -436,11 +478,14 @@ def chart_benefits_rate(
     fig, ax = plt.subplots(figsize=(10, 6))
 
     ax.bar(
-        enrollment.index,
+        enrollment.index.astype(str),
         enrollment.values,
+        color=SERIES_COLOR,
     )
 
     ax.set_title("Benefits Enrollment Rate by Department")
+
+    ax.set_xlabel("Department")
 
     ax.set_ylabel("Enrollment (%)")
 
@@ -561,6 +606,7 @@ def chart_quality_summary(
                     data["passed"],
                     width=width,
                     label="Passed",
+                    color=PASSED_COLOR,
                 )
 
                 ax.bar(
@@ -568,6 +614,7 @@ def chart_quality_summary(
                     data["failed"],
                     width=width,
                     label="Failed",
+                    color=FAILED_COLOR,
                 )
 
                 ax.set_title(
@@ -676,6 +723,7 @@ def chart_quality_summary(
             passed,
             failed,
         ],
+        color=[PASSED_COLOR, FAILED_COLOR],
     )
 
     ax.set_title(
@@ -734,6 +782,7 @@ def create_eda_report_dashboard(
         axes[0, 0].barh(
             dept.index,
             dept.values,
+            color=SERIES_COLOR,
         )
 
         axes[0, 0].invert_yaxis()
@@ -755,6 +804,7 @@ def create_eda_report_dashboard(
         axes[0, 1].bar(
             country.index,
             country.values,
+            color=SERIES_COLOR,
         )
 
         axes[0, 1].set_title("Headcount by Country")
@@ -803,11 +853,14 @@ def create_eda_report_dashboard(
 
         if groups:
 
-            axes[1, 0].boxplot(
+            box = axes[1, 0].boxplot(
                 groups,
                 tick_labels=labels,
                 showmeans=True,
+                patch_artist=True,
             )
+
+            paint_boxplot(box)
 
             axes[1, 0].set_title("Salary Distribution by Employment Type")
 
@@ -849,7 +902,10 @@ def create_eda_report_dashboard(
 
         except Exception:
 
-            pass
+            logger.warning(
+                "Unable to normalize hire date timezone for the tenure chart.",
+                exc_info=True,
+            )
 
         today = pd.Timestamp.today()
 
@@ -862,6 +918,7 @@ def create_eda_report_dashboard(
             axes[1, 1].hist(
                 tenure,
                 bins=20,
+                color=SERIES_COLOR,
             )
 
             axes[1, 1].set_title("Tenure Distribution")
@@ -874,26 +931,23 @@ def create_eda_report_dashboard(
     # Chart 5 — Benefits
     # ============================================================
 
-    if {
-        "department",
-        "benefit_plans",
-    }.issubset(df.columns):
+    if "department" in df.columns and (
+        "benefit_plans" in df.columns or "benefits_matched" in df.columns
+    ):
 
-        benefits = (
-            df.groupby("department")["benefit_plans"]
-            .apply(lambda x: x.notna().mean() * 100)
-            .sort_values(ascending=False)
-            .head(10)
-        )
+        benefits = enrollment_rate_by_department(df, limit=10)
 
         if not benefits.empty:
 
             axes[2, 0].bar(
-                benefits.index,
+                benefits.index.astype(str),
                 benefits.values,
+                color=SERIES_COLOR,
             )
 
             axes[2, 0].set_title("Benefits Enrollment Rate")
+
+            axes[2, 0].set_xlabel("Department")
 
             axes[2, 0].set_ylabel("Enrollment (%)")
 
@@ -952,6 +1006,7 @@ def create_eda_report_dashboard(
                 quality["passed"],
                 width=width,
                 label="Passed",
+                color=PASSED_COLOR,
             )
 
             axes[2, 1].bar(
@@ -959,6 +1014,7 @@ def create_eda_report_dashboard(
                 quality["failed"],
                 width=width,
                 label="Failed",
+                color=FAILED_COLOR,
             )
 
             axes[2, 1].set_xticks(list(positions))
@@ -1014,6 +1070,7 @@ def create_eda_report_dashboard(
                     0,
                 ),
             ],
+            color=[PASSED_COLOR, FAILED_COLOR],
         )
 
         axes[2, 1].set_title("Data Quality Summary")

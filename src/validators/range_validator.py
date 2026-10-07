@@ -34,6 +34,16 @@ class RangeValidator(BaseValidator):
 
         if self.column not in df.columns:
 
+            errors.append(
+                {
+                    "employee_id": None,
+                    "rule": "MISSING_COLUMN",
+                    "column": self.column,
+                    "value": None,
+                    "message": f"Missing column '{self.column}'",
+                }
+            )
+
             return pd.DataFrame(errors)
 
         for _, row in df.iterrows():

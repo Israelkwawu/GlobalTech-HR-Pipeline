@@ -22,6 +22,7 @@ import pandas as pd
 from config.logging_config import get_logger
 
 
+from src.transformers.employee_id import namespace_employee_ids
 from src.transformers.salary import (
     normalize_salary_columns,
 )
@@ -212,57 +213,26 @@ def normalize_payroll(
 
     df = normalize_salary_columns(df)
 
+    if "company_origin" not in df.columns:
+        df["company_origin"] = "GlobalTech"
+
+    if "employee_id" in df.columns:
+        df = namespace_employee_ids(df)
+
     # --------------------------------------------------------
     # Validation logging
     # --------------------------------------------------------
 
-    logger.info(
-        """
-========== PAYROLL NORMALIZATION ==========
-Rows: %s
-
-Columns:
-%s
-
-Salary fields:
-%s
-==========================================
-""",
-        len(df),
-        list(df.columns),
-        [
-            column
-            for column in [
-                "salary",
-                "salary_numeric",
-                "salary_annual",
-                "salary_usd_annual",
-                "currency",
-                "pay_frequency",
-            ]
-            if column in df.columns
-        ],
+    populated = (
+        int(df["salary_usd_annual"].notna().sum())
+        if "salary_usd_annual" in df.columns
+        else 0
     )
 
-    if "salary_usd_annual" in df.columns:
-
-        logger.info(
-            "Salary USD sample:\n%s",
-            df[
-                [
-                    c
-                    for c in [
-                        "employee_id",
-                        "salary",
-                        "currency",
-                        "pay_frequency",
-                        "salary_usd_annual",
-                    ]
-                    if c in df.columns
-                ]
-            ]
-            .head(5)
-            .to_string(),
-        )
+    logger.info(
+        "Payroll normalized rows=%s salary_usd=%s",
+        len(df),
+        populated,
+    )
 
     return df

@@ -101,6 +101,42 @@ logger = get_logger(__name__)
 DEFAULT_OUTPUT_DIR = Path("outputs")
 
 
+def _assign_company_origin(
+    df: pd.DataFrame,
+    default: str,
+) -> pd.DataFrame:
+    """
+    Fill only missing or non-company origins.
+
+    Payroll rows already carry GlobalTech or AcquiredCo from the source
+    file. Replacing the whole column would namespace every id as GlobalTech
+    and hide AcquiredCo pay records.
+    """
+
+    df = df.copy()
+
+    if "company_origin" not in df.columns:
+        df["company_origin"] = default
+        return df
+
+    normalized = (
+        df["company_origin"]
+        .astype("string")
+        .str.strip()
+        .replace(
+            {
+                "globaltech": "GlobalTech",
+                "GLOBALTECH": "GlobalTech",
+                "acquiredco": "AcquiredCo",
+                "ACQUIREDCO": "AcquiredCo",
+            }
+        )
+    )
+    recognized = normalized.isin(["GlobalTech", "AcquiredCo"])
+    df["company_origin"] = normalized.where(recognized, default)
+    return df
+
+
 # ============================================================
 # Golden Dataset Preparation
 # ============================================================
@@ -144,10 +180,24 @@ def prepare_golden_dataset(
 
         if "employee_id" in df.columns:
 
-            df = df.sort_values("employee_id").drop_duplicates(
+            populated = df["email"].notna()
+            ranked = df.loc[populated].copy()
+
+            if "company_origin" in ranked.columns:
+                ranked["_origin_rank"] = (
+                    ranked["company_origin"]
+                    .map({"GlobalTech": 0, "AcquiredCo": 1})
+                    .fillna(2)
+                )
+            else:
+                ranked["_origin_rank"] = 0
+
+            ranked = ranked.sort_values("_origin_rank").drop_duplicates(
                 subset=["email"],
                 keep="first",
             )
+            ranked = ranked.drop(columns=["_origin_rank"])
+            df = pd.concat([ranked, df.loc[~populated]], ignore_index=True)
 
     # --------------------------------------------------------
     # Employment type normalization
@@ -320,7 +370,7 @@ class HRPipeline:
             "payroll",
         )
 
-        payroll["company_origin"] = "GlobalTech"
+        payroll = _assign_company_origin(payroll, "GlobalTech")
 
         payroll["source_system"] = "payroll"
 
@@ -340,7 +390,7 @@ class HRPipeline:
             "benefits",
         )
 
-        benefits["company_origin"] = "GlobalTech"
+        benefits = _assign_company_origin(benefits, "GlobalTech")
 
         benefits["source_system"] = "benefits"
 
@@ -513,19 +563,71 @@ class HRPipeline:
     def export(
         self,
         golden_dataset: pd.DataFrame,
+        ghost_employees: pd.DataFrame | None = None,
+        probable_matches: pd.DataFrame | None = None,
     ) -> Path:
         """
-        Export golden employee dataset.
+        Export the golden dataset and the HR review files.
+
+        The golden dataset is partitioned by company_origin.
+        Ghost and probable-match files stay as CSV for HR review.
         """
 
         logger.info("Exporting golden dataset...")
 
-        output_file = self.output_dir / "golden_employee_dataset.parquet"
+        output_file = self.output_dir / "golden_employee_dataset"
 
-        return export_dataset(
+        exported = export_dataset(
             golden_dataset,
             output_file,
+            partition_by="company_origin",
         )
+
+        ghost_columns = [
+            "payroll_employee_id",
+            "name",
+            "salary_usd_annual",
+            "ghost_flag_reason",
+        ]
+
+        if ghost_employees is not None:
+            ghost_frame = ghost_employees.copy()
+
+            if "source_system" in ghost_frame.columns:
+                ghost_frame = ghost_frame.loc[
+                    ghost_frame["source_system"].astype(str).eq("payroll")
+                ].copy()
+
+            for column in ghost_columns:
+                if column not in ghost_frame.columns:
+                    ghost_frame[column] = pd.NA
+
+            ghost_frame.reindex(columns=ghost_columns).to_csv(
+                self.output_dir / "ghost_employees.csv",
+                index=False,
+            )
+
+        review_columns = [
+            "record_1_id",
+            "record_2_id",
+            "similarity_score",
+            "hire_date_diff_days",
+            "recommended_action",
+        ]
+
+        if probable_matches is not None:
+            review = probable_matches.copy()
+
+            for column in review_columns:
+                if column not in review.columns:
+                    review[column] = pd.NA
+
+            review.reindex(columns=review_columns).to_csv(
+                self.output_dir / "probable_matches.csv",
+                index=False,
+            )
+
+        return exported
 
     # ========================================================
     # VISUALIZATION
@@ -560,97 +662,22 @@ class HRPipeline:
     def run(self) -> dict:
         """
         Execute complete ETL pipeline.
-
-        Includes diagnostic logging for:
-        - salary transformation
-        - payroll enrichment
-        - golden dataset quality
         """
 
         logger.info("===== HR PIPELINE START =====")
 
-        # ========================================================
-        # 1. INGEST
-        # ========================================================
-
         sources = self.ingest()
-
-        for name, df in sources.items():
-
-            logger.info(
-                "[INGEST] %s rows=%s columns=%s",
-                name,
-                len(df),
-                list(df.columns),
-            )
-
-        # ========================================================
-        # 2. TRANSFORM
-        # ========================================================
 
         logger.info("===== TRANSFORMATION START =====")
 
         transformed = self.transform(sources)
 
         employees = transformed["employees"]
-
         payroll = transformed["payroll"]
-
         benefits = transformed["benefits"]
 
-        logger.info(
-            "[EMPLOYEES] rows=%s columns=%s",
-            len(employees),
-            list(employees.columns),
-        )
-
-        logger.info(
-            "[PAYROLL] rows=%s columns=%s",
-            len(payroll),
-            list(payroll.columns),
-        )
-
-        logger.info(
-            "[BENEFITS] rows=%s columns=%s",
-            len(benefits),
-            list(benefits.columns),
-        )
-
-        # ========================================================
-        # Salary diagnostic after payroll transform
-        # ========================================================
-
-        salary_columns = [
-            "employee_id",
-            "salary",
-            "currency",
-            "pay_frequency",
-            "salary_usd_annual",
-        ]
-
-        existing_salary_columns = [c for c in salary_columns if c in payroll.columns]
-
-        if existing_salary_columns:
-
-            logger.info(
-                "Payroll salary preview:\n%s",
-                payroll[existing_salary_columns].head(10).to_string(),
-            )
-
-            if "salary_usd_annual" in payroll.columns:
-
-                logger.info(
-                    "Payroll salary_usd_annual stats:\n%s",
-                    payroll["salary_usd_annual"].describe().to_string(),
-                )
-
-        else:
-
+        if "salary_usd_annual" not in payroll.columns:
             logger.warning("No salary columns found after payroll transformation")
-
-        # ========================================================
-        # 3. DEDUPLICATION
-        # ========================================================
 
         logger.info("===== DEDUPLICATION START =====")
 
@@ -662,87 +689,20 @@ class HRPipeline:
 
         golden_dataset = deduplication_result["golden_dataset"]
 
-        logger.info(
-            "[GOLDEN BEFORE CLEANUP] rows=%s columns=%s",
-            len(golden_dataset),
-            list(golden_dataset.columns),
-        )
-
-        # ========================================================
-        # Salary diagnostic after merge
-        # ========================================================
-
-        existing_salary_columns = [
-            c for c in salary_columns if c in golden_dataset.columns
-        ]
-
-        if existing_salary_columns:
-
-            logger.info(
-                "Golden salary preview:\n%s",
-                golden_dataset[existing_salary_columns].head(10).to_string(),
-            )
-
-        else:
-
+        if "salary_usd_annual" not in golden_dataset.columns:
             logger.error("Salary columns disappeared after enrichment")
-
-        # ========================================================
-        # 4. FINAL CLEANUP
-        # ========================================================
 
         logger.info("Preparing final golden dataset...")
 
         golden_dataset = prepare_golden_dataset(golden_dataset)
 
         logger.info(
-            "[GOLDEN AFTER CLEANUP] rows=%s columns=%s",
+            "Golden dataset rows=%s",
             len(golden_dataset),
-            list(golden_dataset.columns),
         )
 
-        # ========================================================
-        # Final Salary Validation Diagnostic
-        # ========================================================
-
-        salary_columns = [
-            "salary",
-            "salary_numeric",
-            "salary_annual",
-            "salary_usd_annual",
-            "currency",
-            "pay_frequency",
-        ]
-
-        existing_salary_columns = [
-            c for c in salary_columns if c in golden_dataset.columns
-        ]
-
-        if existing_salary_columns:
-
-            logger.info(
-                """
-                ========== FINAL SALARY CHECK ==========
-                Columns:
-                %s
-
-                Sample:
-                %s
-
-                Statistics:
-                %s
-                ========================================
-                """,
-                existing_salary_columns,
-                golden_dataset[existing_salary_columns].head(20).to_string(),
-                golden_dataset[existing_salary_columns]
-                .describe(include="all")
-                .to_string(),
-            )
-
-        else:
-
-            logger.error("FINAL DATASET HAS NO SALARY FIELDS")
+        if "salary_usd_annual" not in golden_dataset.columns:
+            logger.error("Final dataset has no salary fields")
 
         # ========================================================
         # 5. VALIDATION
@@ -765,7 +725,11 @@ class HRPipeline:
         # 7. EXPORT
         # ========================================================
 
-        exported_file = self.export(golden_dataset)
+        exported_file = self.export(
+            golden_dataset,
+            deduplication_result.get("ghost_employees"),
+            deduplication_result.get("fuzzy_matches"),
+        )
 
         # ========================================================
         # 8. VISUALIZATION

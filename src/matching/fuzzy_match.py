@@ -23,6 +23,7 @@ from rapidfuzz import fuzz
 
 from config.constants import (
     FUZZY_MATCH_THRESHOLD,
+    MAX_HIRE_DATE_DIFF_DAYS,
 )
 
 from config.logging_config import get_logger
@@ -116,24 +117,42 @@ def is_probable_match(
 # ============================================================================
 
 
-def _blocking_key(
-    names: pd.Series,
-) -> pd.Series:
+REVIEW_COLUMNS = [
+    "record_1_id",
+    "record_2_id",
+    "left_name",
+    "right_name",
+    "similarity_score",
+    "score",
+    "hire_date_diff_days",
+    "recommended_action",
+    "probable_match",
+    "match_method",
+]
+
+
+def _hire_date_window(
+    left_date: pd.Timestamp,
+    right: pd.DataFrame,
+    window_days: int,
+) -> pd.DataFrame:
     """
-    Generate blocking key from full name.
+    Return right-hand rows hired within window_days of left_date.
 
-    Example
-    -------
-    John Smith -> s
-    Jane Doe   -> d
-
-    Uses surname initial to reduce
-    unnecessary comparisons.
+    Candidates are taken from a date-sorted frame with a sliding window
+    so the comparison stays inside the hire-date block instead of all pairs.
     """
 
-    names = names.apply(_safe_string).astype(str).str.strip()
+    if pd.isna(left_date) or right.empty:
+        return right.iloc[0:0]
 
-    return names.str.split().str[-1].str.lower().str[0].fillna("")
+    start = left_date - pd.Timedelta(days=window_days)
+    end = left_date + pd.Timedelta(days=window_days)
+    dates = right["_hire_date_sort"]
+    start_at = dates.searchsorted(start, side="left")
+    end_at = dates.searchsorted(end, side="right")
+
+    return right.iloc[int(start_at) : int(end_at)]
 
 
 # ============================================================================
@@ -147,86 +166,73 @@ def fuzzy_match(
     left_column: str = "full_name",
     right_column: str = "full_name",
     threshold: int = FUZZY_MATCH_THRESHOLD,
+    window_days: int = MAX_HIRE_DATE_DIFF_DAYS,
 ) -> pd.DataFrame:
     """
     Perform fuzzy employee matching.
+
+    When both frames carry hire_date, candidates are limited to records
+    hired within window_days of each other. Pairs at or above the
+    similarity threshold are flagged for HR review and are not merged.
     """
 
-    logger.info("Running blocked fuzzy matching...")
-
-    # ----------------------------------------------------
-    # Validate input
-    # ----------------------------------------------------
+    logger.info("Running hire-date blocked fuzzy matching...")
 
     if left_column not in left.columns:
 
-        raise KeyError(f"Missing column '{left_column}' " "in left dataframe")
+        raise KeyError(f"Missing column '{left_column}' in left dataframe")
 
     if right_column not in right.columns:
 
-        raise KeyError(f"Missing column '{right_column}' " "in right dataframe")
+        raise KeyError(f"Missing column '{right_column}' in right dataframe")
 
-    # ----------------------------------------------------
-    # Empty input handling
-    # ----------------------------------------------------
-
-    empty_result = pd.DataFrame(
-        columns=[
-            "left_name",
-            "right_name",
-            "score",
-            "match_method",
-        ]
-    )
+    empty_result = pd.DataFrame(columns=REVIEW_COLUMNS)
 
     if left.empty or right.empty:
 
         return empty_result
 
     left = left.copy()
-
     right = right.copy()
 
-    # ----------------------------------------------------
-    # Normalize names
-    # ----------------------------------------------------
-
     left[left_column] = left[left_column].apply(_safe_string)
-
     right[right_column] = right[right_column].apply(_safe_string)
 
-    # Remove empty names
-
     left = left[left[left_column].str.len() > 2]
-
     right = right[right[right_column].str.len() > 2]
 
     if left.empty or right.empty:
 
         return empty_result
 
-    # ----------------------------------------------------
-    # Blocking
-    # ----------------------------------------------------
+    use_hire_block = "hire_date" in left.columns and "hire_date" in right.columns
 
-    left["block"] = _blocking_key(left[left_column])
+    if use_hire_block:
 
-    right["block"] = _blocking_key(right[right_column])
+        right["_hire_date_sort"] = pd.to_datetime(right["hire_date"], errors="coerce")
+        left["_hire_date_sort"] = pd.to_datetime(left["hire_date"], errors="coerce")
+        right = right.dropna(subset=["_hire_date_sort"]).sort_values("_hire_date_sort")
+        left = left.dropna(subset=["_hire_date_sort"])
 
-    grouped_right = {key: group for key, group in right.groupby("block")}
+    if left.empty or right.empty:
+
+        return empty_result
 
     matches = []
 
-    # ----------------------------------------------------
-    # Compare candidates
-    # ----------------------------------------------------
-
     for _, left_row in left.iterrows():
 
-        candidates = grouped_right.get(
-            left_row["block"],
-            pd.DataFrame(),
-        )
+        if use_hire_block:
+
+            candidates = _hire_date_window(
+                left_row["_hire_date_sort"],
+                right,
+                window_days,
+            )
+
+        else:
+
+            candidates = right
 
         if candidates.empty:
 
@@ -234,39 +240,73 @@ def fuzzy_match(
 
         for _, right_row in candidates.iterrows():
 
+            left_id = left_row.get("employee_id")
+            right_id = right_row.get("employee_id")
+
+            if (
+                pd.notna(left_id)
+                and pd.notna(right_id)
+                and str(left_id) == str(right_id)
+            ):
+
+                continue
+
             score = similarity_score(
                 left_row[left_column],
                 right_row[right_column],
             )
 
-            if score >= threshold:
+            if score < threshold:
 
-                matches.append(
-                    {
-                        "left_name": left_row[left_column],
-                        "right_name": right_row[right_column],
-                        "score": score,
-                        "match_method": "fuzzy_name",
-                    }
+                continue
+
+            if use_hire_block:
+
+                hire_gap = abs(
+                    (left_row["_hire_date_sort"] - right_row["_hire_date_sort"]).days
                 )
 
-    logger.info(
-        "Probable matches found: %s",
-        len(matches),
-    )
+            else:
+
+                hire_gap = None
+
+            pair = tuple(
+                sorted(
+                    str(value)
+                    for value in (left_id, right_id)
+                    if pd.notna(value)
+                )
+            )
+
+            matches.append(
+                {
+                    "record_1_id": None if pd.isna(left_id) else str(left_id),
+                    "record_2_id": None if pd.isna(right_id) else str(right_id),
+                    "left_name": left_row[left_column],
+                    "right_name": right_row[right_column],
+                    "similarity_score": score,
+                    "score": score,
+                    "hire_date_diff_days": hire_gap,
+                    "recommended_action": "HR review required before any merge",
+                    "probable_match": True,
+                    "match_method": "fuzzy_name",
+                    "_pair": pair,
+                }
+            )
+
+    logger.info("Probable matches found: %s", len(matches))
 
     if not matches:
 
         return empty_result
 
-    return (
-        pd.DataFrame(matches)
-        .sort_values(
-            by="score",
-            ascending=False,
-        )
-        .reset_index(drop=True)
-    )
+    review = pd.DataFrame(matches).sort_values(by="score", ascending=False)
+
+    if review["_pair"].map(len).eq(2).any():
+
+        review = review.drop_duplicates(subset=["_pair"])
+
+    return review.drop(columns=["_pair"]).reset_index(drop=True)
 
 
 # ============================================================================
