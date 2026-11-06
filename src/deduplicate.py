@@ -364,20 +364,46 @@ def _collapse_group(
     if method and len(ranked) > 1:
         survivor["dedup_method"] = method
 
-    return survivor.drop(labels=[c for c in survivor.index if str(c).startswith("_")])
+    kept_internal = {"_ledger_row", "_ledger_source"}
+    return survivor.drop(
+        labels=[
+            c
+            for c in survivor.index
+            if str(c).startswith("_") and c not in kept_internal
+        ]
+    )
 
 
-def _collapse_by_employee_id(df: pd.DataFrame) -> pd.DataFrame:
+def _collapse_by_employee_id(
+    df: pd.DataFrame,
+    routed: list[pd.DataFrame] | None = None,
+) -> pd.DataFrame:
     """Pass 1. Same namespaced id is one employee. HRIS fields survive."""
 
     if df.empty or "employee_id" not in df.columns:
         return df
 
     before = len(df)
-    collapsed = [
-        _collapse_group(group, "exact_id" if len(group) > 1 else None)
-        for _, group in df.groupby("employee_id", dropna=False, sort=False)
-    ]
+    collapsed = []
+
+    for _, group in df.groupby("employee_id", dropna=False, sort=False):
+        survivor = _collapse_group(group, "exact_id" if len(group) > 1 else None)
+        collapsed.append(survivor)
+
+        if routed is None or len(group) < 2 or "_ledger_row" not in group.columns:
+            continue
+
+        survivor_row = survivor.get("_ledger_row")
+        if pd.isna(survivor_row):
+            continue
+
+        extra = group.loc[~group["_ledger_row"].astype(str).eq(str(survivor_row))].copy()
+        if extra.empty:
+            continue
+
+        extra["_disposition"] = "folded_exact_id"
+        routed.append(extra)
+
     result = pd.DataFrame(collapsed).reset_index(drop=True)
 
     logger.info("Exact-id rows before=%s after=%s", before, len(result))
@@ -392,6 +418,7 @@ def _email_key(series: pd.Series) -> pd.Series:
 
 def _collapse_cross_company_email(
     df: pd.DataFrame,
+    routed: list[pd.DataFrame] | None = None,
 ) -> tuple[pd.DataFrame, pd.DataFrame, dict[str, str]]:
     """
     Pass 2. The same email at GlobalTech and AcquiredCo is one person.
@@ -422,6 +449,14 @@ def _collapse_cross_company_email(
         if len(group) > 1 and cross_company:
             survivor = _collapse_group(group.drop(columns=["_email_key"]), "email_match")
             survivor_id = str(survivor["employee_id"])
+
+            if routed is not None and "_ledger_row" in group.columns and pd.notna(survivor.get("_ledger_row")):
+                extra = group.loc[
+                    ~group["_ledger_row"].astype(str).eq(str(survivor["_ledger_row"]))
+                ].copy()
+                if not extra.empty:
+                    extra["_disposition"] = "folded_email_match"
+                    routed.append(extra)
 
             for employee_id in group["employee_id"].dropna().astype(str):
                 if employee_id != survivor_id:
@@ -488,6 +523,54 @@ def _flag_probable_matches(
     return golden
 
 
+def _stamp_rows(df: pd.DataFrame, population: str) -> pd.DataFrame:
+    """Number each source row so a later merge can still be traced."""
+
+    df = df.copy()
+    df["_ledger_row"] = pd.RangeIndex(start=0, stop=len(df))
+    df["_ledger_source"] = population
+    return df
+
+
+def _missing_employee_id(df: pd.DataFrame) -> pd.Series:
+    if "employee_id" not in df.columns:
+        return pd.Series(True, index=df.index)
+
+    value = df["employee_id"].astype("string").str.strip()
+    return value.isna() | value.str.lower().isin(["", "nan", "none", "<na>", "nat"])
+
+
+def _exclude_missing_ids(
+    df: pd.DataFrame,
+    routed: list[pd.DataFrame],
+) -> pd.DataFrame:
+    """Keep rows with no employee id out of the golden dataset and on the ledger."""
+
+    missing = _missing_employee_id(df)
+    if missing.any():
+        excluded = df.loc[missing].copy()
+        excluded["_disposition"] = "excluded_missing_employee_id"
+        routed.append(excluded)
+        logger.warning("Excluded %s rows with no employee id", int(missing.sum()))
+
+    return df.loc[~missing].copy()
+
+
+def _ledger_id_set(frame: pd.DataFrame) -> set[int]:
+    if frame is None or frame.empty or "_ledger_row" not in frame.columns:
+        return set()
+
+    values = pd.to_numeric(frame["_ledger_row"], errors="coerce").dropna()
+    return {int(value) for value in values.tolist()}
+
+
+def _concat_routed(routed: list[pd.DataFrame]) -> pd.DataFrame:
+    if not routed:
+        return pd.DataFrame(columns=["_ledger_row", "_ledger_source", "_disposition", "employee_id"])
+
+    return pd.concat(routed, ignore_index=True)
+
+
 # ============================================================
 # MAIN
 # ============================================================
@@ -516,9 +599,21 @@ def deduplicate_employees(
         "benefits",
     )
 
+    employees = _stamp_rows(employees, "hris")
+    payroll = _stamp_rows(payroll, "payroll")
+    benefits = _stamp_rows(benefits, "benefits")
+    hris_received = employees.copy()
+    payroll_received = payroll.copy()
+    benefits_received = benefits.copy()
+
     employees = _ensure_row_provenance(employees, "globaltech_hris")
     payroll = _ensure_row_provenance(payroll, "payroll")
     benefits = _ensure_row_provenance(benefits, "benefits")
+
+    routed: list[pd.DataFrame] = []
+    employees = _exclude_missing_ids(employees, routed)
+    payroll = _exclude_missing_ids(payroll, routed)
+    benefits = _exclude_missing_ids(benefits, routed)
 
     logger.info(
         "Dedup sources employees=%s payroll=%s benefits=%s",
@@ -532,7 +627,7 @@ def deduplicate_employees(
     # Exact ID match, HRIS > Payroll > Benefits
     # --------------------------------------------------------
 
-    employees = _collapse_by_employee_id(employees)
+    employees = _collapse_by_employee_id(employees, routed)
 
     exact_matches = exact_employee_match(
         employees,
@@ -544,7 +639,7 @@ def deduplicate_employees(
     # Cross-company email match, applied to the golden population
     # --------------------------------------------------------
 
-    employees, email_matches, id_alias = _collapse_cross_company_email(employees)
+    employees, email_matches, id_alias = _collapse_cross_company_email(employees, routed)
 
     payroll = _apply_id_alias(payroll, id_alias)
     benefits = _apply_id_alias(benefits, id_alias)
@@ -580,14 +675,16 @@ def deduplicate_employees(
     golden_dataset = merge_payroll(
         employees,
         payroll,
+        routed,
     )
 
     golden_dataset = merge_benefits(
         golden_dataset,
         benefits,
+        routed,
     )
 
-    golden_dataset = _collapse_by_employee_id(golden_dataset)
+    golden_dataset = _collapse_by_employee_id(golden_dataset, routed)
 
     # --------------------------------------------------------
     # PASS 3
@@ -607,8 +704,15 @@ def deduplicate_employees(
     duplicate_ids = golden_dataset["employee_id"].duplicated().sum()
 
     if duplicate_ids:
-
-        raise RuntimeError(f"Golden dataset duplicate IDs={duplicate_ids}")
+        logger.error(
+            "Golden dataset duplicate IDs=%s. Extras are listed in row_disposition.csv.",
+            duplicate_ids,
+        )
+        duplicate_mask = golden_dataset["employee_id"].duplicated(keep="first")
+        extras = golden_dataset.loc[duplicate_mask].copy()
+        extras["_disposition"] = "excluded_duplicate_employee_id"
+        routed.append(extras)
+        golden_dataset = golden_dataset.loc[~duplicate_mask].copy()
 
     salary_populated = (
         int(golden_dataset["salary"].notna().sum())
@@ -629,4 +733,13 @@ def deduplicate_employees(
         "email_matches": email_matches,
         "fuzzy_matches": fuzzy_matches,
         "ghost_employees": ghosts,
+        "row_ledger": {
+            "hris": hris_received,
+            "payroll": payroll_received,
+            "benefits": benefits_received,
+            "routed": _concat_routed(routed),
+            "payroll_ghost_rows": _ledger_id_set(payroll_ghosts),
+            "benefits_ghost_rows": _ledger_id_set(benefits_ghosts),
+            "id_alias": id_alias,
+        },
     }

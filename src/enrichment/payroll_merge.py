@@ -331,26 +331,29 @@ def prepare_payroll(
 def deduplicate_ids(
     df,
     name,
+    routed: list | None = None,
+    disposition: str | None = None,
 ):
 
-    before = len(df)
+    if df.empty or "employee_id" not in df.columns:
+        return df
 
-    df = df.drop_duplicates(
-        subset=["employee_id"],
-        keep="last",
-    )
+    duplicate = df["employee_id"].duplicated(keep="last")
+    removed = int(duplicate.sum())
 
-    removed = before - len(df)
+    if routed is not None and disposition and removed:
+        recorded = df.loc[duplicate].copy()
+        recorded["_disposition"] = disposition
+        routed.append(recorded)
 
     if removed:
-
         logger.warning(
             "%s duplicate IDs removed=%s",
             name,
             removed,
         )
 
-    return df
+    return df.loc[~duplicate].copy()
 
 
 # ============================================================
@@ -387,6 +390,7 @@ def select_payroll_columns(
 def merge_payroll(
     employees: pd.DataFrame,
     payroll: pd.DataFrame,
+    routed: list | None = None,
 ):
 
     logger.info("Starting payroll merge")
@@ -412,11 +416,15 @@ def merge_payroll(
     employees = deduplicate_ids(
         employees,
         "Employees",
+        routed,
+        "excluded_duplicate_employee_id",
     )
 
     payroll = deduplicate_ids(
         payroll,
         "Payroll",
+        routed,
+        "payroll_duplicate_collapsed",
     )
 
     # Keep employee IDs as primary key

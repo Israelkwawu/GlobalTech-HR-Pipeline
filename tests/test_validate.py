@@ -299,15 +299,19 @@ def test_gate_allows_two_failed_checks():
     assert result["summary"]["pipeline_passed"] is True
 
 
-def test_gate_halts_after_more_than_two_failed_checks():
+def test_gate_records_more_than_two_failed_checks(tmp_path):
 
     df = valid_employee_dataframe()
     df.loc[0, "email"] = None
     df.loc[0, "salary_usd_annual"] = 1000
     df.loc[0, "manager_id"] = "GT-999999"
 
-    with pytest.raises(RuntimeError, match="Data quality gate failed"):
-        validate(df)
+    result = validate(df, tmp_path)
+
+    assert result["summary"]["failed_checks"] > 2
+    assert result["summary"]["pipeline_passed"] is False
+    assert (tmp_path / "validation_report.csv").exists()
+    assert (tmp_path / "validation_errors.csv").exists()
 
 
 # ============================================================================

@@ -113,16 +113,18 @@ def test_load_globaltech_hris(tmp_path):
 
 
 def test_globaltech_missing_file():
-    with pytest.raises(FileNotFoundError):
-        load_globaltech_hris("missing.csv")
+    df = load_globaltech_hris("missing.csv")
+
+    assert df.empty
 
 
 def test_globaltech_invalid_extension(tmp_path):
     file = tmp_path / "employees.txt"
     file.write_text("hello")
 
-    with pytest.raises(ValueError):
-        load_globaltech_hris(file)
+    df = load_globaltech_hris(file)
+
+    assert df.empty
 
 
 # ==========================================================
@@ -147,24 +149,27 @@ def test_load_acquiredco_hris(tmp_path):
 
 
 def test_acquiredco_missing_file():
-    with pytest.raises(FileNotFoundError):
-        load_acquiredco_hris("missing.json")
+    df = load_acquiredco_hris("missing.json")
+
+    assert df.empty
 
 
 def test_acquiredco_invalid_extension(tmp_path):
     file = tmp_path / "employees.csv"
     file.write_text("hello")
 
-    with pytest.raises(ValueError):
-        load_acquiredco_hris(file)
+    df = load_acquiredco_hris(file)
+
+    assert df.empty
 
 
 def test_acquiredco_bad_json(tmp_path):
     file = tmp_path / "bad.json"
     file.write_text("{invalid json")
 
-    with pytest.raises(RuntimeError):
-        load_acquiredco_hris(file)
+    df = load_acquiredco_hris(file)
+
+    assert df.empty
 
 
 # ==========================================================
@@ -182,16 +187,18 @@ def test_load_payroll(tmp_path):
 
 
 def test_payroll_missing_file():
-    with pytest.raises(FileNotFoundError):
-        load_payroll("missing.xlsx")
+    df = load_payroll("missing.xlsx")
+
+    assert df.empty
 
 
 def test_payroll_invalid_extension(tmp_path):
     file = tmp_path / "payroll.csv"
     file.write_text("hello")
 
-    with pytest.raises(ValueError):
-        load_payroll(file)
+    df = load_payroll(file)
+
+    assert df.empty
 
 
 # ==========================================================
@@ -210,24 +217,27 @@ def test_load_benefits(tmp_path):
 
 
 def test_benefits_missing_file():
-    with pytest.raises(FileNotFoundError):
-        load_benefits("missing.xml")
+    df = load_benefits("missing.xml")
+
+    assert df.empty
 
 
 def test_benefits_invalid_extension(tmp_path):
     file = tmp_path / "benefits.txt"
     file.write_text("hello")
 
-    with pytest.raises(ValueError):
-        load_benefits(file)
+    df = load_benefits(file)
+
+    assert df.empty
 
 
 def test_benefits_bad_xml(tmp_path):
     file = tmp_path / "bad.xml"
     file.write_text("<employees><employee></employees>")
 
-    with pytest.raises(RuntimeError):
-        load_benefits(file)
+    df = load_benefits(file)
+
+    assert df.empty
 
 
 # ==========================================================

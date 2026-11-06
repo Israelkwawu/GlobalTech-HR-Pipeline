@@ -119,7 +119,9 @@ def is_probable_match(
 
 REVIEW_COLUMNS = [
     "record_1_id",
+    "record_1_name",
     "record_2_id",
+    "record_2_name",
     "left_name",
     "right_name",
     "similarity_score",
@@ -281,7 +283,9 @@ def fuzzy_match(
             matches.append(
                 {
                     "record_1_id": None if pd.isna(left_id) else str(left_id),
+                    "record_1_name": left_row[left_column],
                     "record_2_id": None if pd.isna(right_id) else str(right_id),
+                    "record_2_name": right_row[right_column],
                     "left_name": left_row[left_column],
                     "right_name": right_row[right_column],
                     "similarity_score": score,

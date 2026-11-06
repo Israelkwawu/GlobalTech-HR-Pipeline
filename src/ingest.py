@@ -36,13 +36,33 @@ from src.utils.helpers import (
 
 from src.models.employee_schema import (
     EMPLOYEE_COLUMNS,
-    REQUIRED_FIELDS,
-    EMPLOYEE_DTYPES,
 )
 
 from src.utils.dead_letter import write_dead_letter
 
 logger = get_logger(__name__)
+
+
+def _skip_bad_source(
+    source_name: str,
+    file_path: str | Path,
+    exc: Exception,
+) -> pd.DataFrame:
+    """Write a bad source file to the dead-letter log and continue."""
+
+    log_file_error(source_name, file_path, exc)
+    write_dead_letter(
+        source_system=source_name,
+        file_name=Path(file_path).name,
+        error=exc,
+    )
+    logger.error(
+        "Skipped %s. Dead-lettered %s: %s",
+        source_name,
+        Path(file_path).name,
+        exc,
+    )
+    return pd.DataFrame()
 
 
 def load_globaltech_hris(
@@ -134,84 +154,19 @@ def load_globaltech_hris(
         return df
 
     except FileNotFoundError as exc:
-
-        log_file_error(
-            source_name,
-            file_path,
-            exc,
-        )
-
-        write_dead_letter(
-            source_system=source_name,
-            file_name=Path(file_path).name,
-            error=exc,
-        )
-
-        raise
-
-    except ValueError as exc:
-
-        log_file_error(
-            source_name,
-            file_path,
-            exc,
-        )
-
-        write_dead_letter(
-            source_system=source_name,
-            file_name=Path(file_path).name,
-            error=exc,
-        )
-
-        raise
+        return _skip_bad_source(source_name, file_path, exc)
 
     except EmptyDataError as exc:
-
-        log_file_error(
-            source_name,
-            file_path,
-            exc,
-        )
-
-        write_dead_letter(
-            source_system=source_name,
-            file_name=Path(file_path).name,
-            error=exc,
-        )
-
-        raise RuntimeError("GlobalTech HRIS file is empty.") from exc
+        return _skip_bad_source(source_name, file_path, exc)
 
     except ParserError as exc:
+        return _skip_bad_source(source_name, file_path, exc)
 
-        log_file_error(
-            source_name,
-            file_path,
-            exc,
-        )
-
-        write_dead_letter(
-            source_system=source_name,
-            file_name=Path(file_path).name,
-            error=exc,
-        )
-
-        raise RuntimeError("Unable to parse GlobalTech HRIS CSV.") from exc
+    except ValueError as exc:
+        return _skip_bad_source(source_name, file_path, exc)
 
     except Exception as exc:
-
-        log_file_error(
-            source_name,
-            file_path,
-            exc,
-        )
-
-        write_dead_letter(
-            source_system=source_name,
-            file_name=Path(file_path).name,
-            error=exc,
-        )
-
-        raise RuntimeError("Unexpected error while loading GlobalTech HRIS.") from exc
+        return _skip_bad_source(source_name, file_path, exc)
 
 
 def load_acquiredco_hris(
@@ -377,68 +332,16 @@ def load_acquiredco_hris(
         return df
 
     except FileNotFoundError as exc:
-
-        log_file_error(
-            source_name,
-            file_path,
-            exc,
-        )
-
-        write_dead_letter(
-            source_system=source_name,
-            file_name=Path(file_path).name,
-            error=exc,
-        )
-
-        raise
+        return _skip_bad_source(source_name, file_path, exc)
 
     except json.JSONDecodeError as exc:
-
-        log_file_error(
-            source_name,
-            file_path,
-            exc,
-        )
-
-        write_dead_letter(
-            source_system=source_name,
-            file_name=Path(file_path).name,
-            error=exc,
-        )
-
-        raise RuntimeError("Malformed JSON file.") from exc
+        return _skip_bad_source(source_name, file_path, exc)
 
     except ValueError as exc:
-
-        log_file_error(
-            source_name,
-            file_path,
-            exc,
-        )
-
-        write_dead_letter(
-            source_system=source_name,
-            file_name=Path(file_path).name,
-            error=exc,
-        )
-
-        raise
+        return _skip_bad_source(source_name, file_path, exc)
 
     except Exception as exc:
-
-        log_file_error(
-            source_name,
-            file_path,
-            exc,
-        )
-
-        write_dead_letter(
-            source_system=source_name,
-            file_name=Path(file_path).name,
-            error=exc,
-        )
-
-        raise RuntimeError("Unexpected error while loading AcquiredCo HRIS.") from exc
+        return _skip_bad_source(source_name, file_path, exc)
 
 
 def load_benefits(
@@ -541,62 +444,16 @@ def load_benefits(
         return df
 
     except FileNotFoundError as exc:
-
-        log_file_error(
-            source_name,
-            file_path,
-            exc,
-        )
-
-        write_dead_letter(
-            source_system=source_name,
-            file_name=Path(file_path).name,
-            error=exc,
-        )
-
-        raise
+        return _skip_bad_source(source_name, file_path, exc)
 
     except ET.ParseError as exc:
-
-        log_file_error(
-            source_name,
-            file_path,
-            exc,
-        )
-
-        raise RuntimeError("Malformed Benefits XML.") from exc
+        return _skip_bad_source(source_name, file_path, exc)
 
     except ValueError as exc:
-
-        log_file_error(
-            source_name,
-            file_path,
-            exc,
-        )
-
-        write_dead_letter(
-            source_system=source_name,
-            file_name=Path(file_path).name,
-            error=exc,
-        )
-
-        raise
+        return _skip_bad_source(source_name, file_path, exc)
 
     except Exception as exc:
-
-        log_file_error(
-            source_name,
-            file_path,
-            exc,
-        )
-
-        write_dead_letter(
-            source_system=source_name,
-            file_name=Path(file_path).name,
-            error=exc,
-        )
-
-        raise RuntimeError("Unexpected error while loading Benefits.") from exc
+        return _skip_bad_source(source_name, file_path, exc)
 
 
 def load_payroll(
@@ -814,52 +671,13 @@ Payroll file missing employee_id column
         return df
 
     except FileNotFoundError as exc:
-
-        log_file_error(
-            source_name,
-            file_path,
-            exc,
-        )
-
-        write_dead_letter(
-            source_system=source_name,
-            file_name=Path(file_path).name,
-            error=exc,
-        )
-
-        raise
+        return _skip_bad_source(source_name, file_path, exc)
 
     except ValueError as exc:
-
-        log_file_error(
-            source_name,
-            file_path,
-            exc,
-        )
-
-        write_dead_letter(
-            source_system=source_name,
-            file_name=Path(file_path).name,
-            error=exc,
-        )
-
-        raise
+        return _skip_bad_source(source_name, file_path, exc)
 
     except Exception as exc:
-
-        log_file_error(
-            source_name,
-            file_path,
-            exc,
-        )
-
-        write_dead_letter(
-            source_system=source_name,
-            file_name=Path(file_path).name,
-            error=exc,
-        )
-
-        raise RuntimeError("Unexpected error while loading Payroll") from exc
+        return _skip_bad_source(source_name, file_path, exc)
 
 
 def align_employee_schema(

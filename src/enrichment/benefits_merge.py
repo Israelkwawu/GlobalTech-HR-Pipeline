@@ -128,27 +128,32 @@ def _ensure_columns(
 
 def _deduplicate_benefits(
     df: pd.DataFrame,
+    routed: list | None = None,
 ):
     """
     Remove duplicate benefit rows.
     """
 
-    before = len(df)
+    if df.empty or not {"employee_id", "plan_type"}.issubset(df.columns):
+        return df
 
-    df = df.drop_duplicates(
-        subset=[
-            "employee_id",
-            "plan_type",
-        ],
+    duplicate = df.duplicated(
+        subset=["employee_id", "plan_type"],
         keep="last",
     )
+    removed = int(duplicate.sum())
+
+    if routed is not None and removed:
+        recorded = df.loc[duplicate].copy()
+        recorded["_disposition"] = "benefits_duplicate_plan"
+        routed.append(recorded)
 
     logger.info(
         "Removed benefit duplicates: %s",
-        before - len(df),
+        removed,
     )
 
-    return df
+    return df.loc[~duplicate].copy()
 
 
 # ============================================================
@@ -159,6 +164,7 @@ def _deduplicate_benefits(
 def merge_benefits(
     employees: pd.DataFrame,
     benefits: pd.DataFrame,
+    routed: list | None = None,
 ) -> pd.DataFrame:
 
     logger.info("Starting benefits enrichment...")
@@ -197,7 +203,17 @@ def merge_benefits(
 
     # Remove invalid IDs
 
+    if routed is not None and benefits["employee_id"].isna().any():
+        missing_benefits = benefits.loc[benefits["employee_id"].isna()].copy()
+        missing_benefits["_disposition"] = "excluded_missing_employee_id"
+        routed.append(missing_benefits)
+
     benefits = benefits[benefits["employee_id"].notna()]
+
+    if routed is not None and employees["employee_id"].isna().any():
+        missing_employees = employees.loc[employees["employee_id"].isna()].copy()
+        missing_employees["_disposition"] = "excluded_missing_employee_id"
+        routed.append(missing_employees)
 
     employees = employees[employees["employee_id"].notna()]
 
@@ -205,21 +221,21 @@ def merge_benefits(
     # Remove employee duplicates before enrichment
     # --------------------------------------------------------
 
-    employee_duplicates = employees["employee_id"].duplicated(keep=False)
+    employees = employees.sort_values("employee_id")
+    duplicate_employees = employees["employee_id"].duplicated(keep="first")
 
-    duplicate_count = employee_duplicates.sum()
-
-    if duplicate_count:
-
+    if int(duplicate_employees.sum()):
         logger.warning(
             "Removing %s duplicate employees before benefits merge",
-            duplicate_count,
+            int(duplicate_employees.sum()),
         )
 
-        employees = employees.sort_values("employee_id").drop_duplicates(
-            subset=["employee_id"],
-            keep="first",
-        )
+        if routed is not None:
+            recorded = employees.loc[duplicate_employees].copy()
+            recorded["_disposition"] = "excluded_duplicate_employee_id"
+            routed.append(recorded)
+
+        employees = employees.loc[~duplicate_employees].copy()
 
     # --------------------------------------------------------
     # Numeric conversion
@@ -239,7 +255,7 @@ def merge_benefits(
     # Remove duplicate benefit rows
     # --------------------------------------------------------
 
-    benefits = _deduplicate_benefits(benefits)
+    benefits = _deduplicate_benefits(benefits, routed)
 
     # --------------------------------------------------------
     # Aggregate benefits
@@ -346,6 +362,11 @@ def merge_benefits(
             "Benefits merge created %s duplicates",
             duplicate_ids,
         )
+
+        if routed is not None:
+            recorded = result.loc[result["employee_id"].duplicated(keep="first")].copy()
+            recorded["_disposition"] = "excluded_duplicate_employee_id"
+            routed.append(recorded)
 
         result = result.drop_duplicates(
             subset=["employee_id"],

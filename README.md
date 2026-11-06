@@ -104,7 +104,7 @@ pytest
 |---|---|---|
 | `outputs/golden_employee_dataset/` | Parquet, partitioned by `company_origin` | Deduplicated employees |
 | `outputs/ghost_employees.csv` | CSV | Payroll rows with no HRIS match: `payroll_employee_id`, `name`, `salary_usd_annual`, `ghost_flag_reason` |
-| `outputs/probable_matches.csv` | CSV | Fuzzy pairs for HR: `record_1_id`, `record_2_id`, `similarity_score`, `hire_date_diff_days`, `recommended_action` |
+| `outputs/probable_matches.csv` | CSV | Fuzzy pairs for HR: `record_1_id`, `record_1_name`, `record_2_id`, `record_2_name`, `similarity_score`, `hire_date_diff_days`, `recommended_action` |
 | `outputs/validation_report.csv` and `.html` | CSV, HTML | Check, totals, pass rate, status |
 | `outputs/charts/` | PNG | Headcount, salary, tenure, benefits, quality |
 

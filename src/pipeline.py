@@ -95,6 +95,12 @@ from src.reports.audit_report import (
     export_audit_report,
 )
 
+from src.reports.row_reconciliation import (
+    assert_rows_balanced,
+    export_reconciliation,
+    reconcile_rows,
+)
+
 logger = get_logger(__name__)
 
 
@@ -144,6 +150,7 @@ def _assign_company_origin(
 
 def prepare_golden_dataset(
     df: pd.DataFrame,
+    routed: list | None = None,
 ) -> pd.DataFrame:
     """
     Final cleanup before validation.
@@ -192,12 +199,19 @@ def prepare_golden_dataset(
             else:
                 ranked["_origin_rank"] = 0
 
-            ranked = ranked.sort_values("_origin_rank").drop_duplicates(
+            ranked = ranked.sort_values("_origin_rank")
+            kept = ranked.drop_duplicates(
                 subset=["email"],
                 keep="first",
             )
-            ranked = ranked.drop(columns=["_origin_rank"])
-            df = pd.concat([ranked, df.loc[~populated]], ignore_index=True)
+            dropped = ranked.loc[~ranked.index.isin(kept.index)].copy()
+
+            if routed is not None and not dropped.empty:
+                dropped["_disposition"] = "excluded_duplicate_email"
+                routed.append(dropped.drop(columns=["_origin_rank"], errors="ignore"))
+
+            kept = kept.drop(columns=["_origin_rank"])
+            df = pd.concat([kept, df.loc[~populated]], ignore_index=True)
 
     # --------------------------------------------------------
     # Employment type normalization
@@ -609,7 +623,9 @@ class HRPipeline:
 
         review_columns = [
             "record_1_id",
+            "record_1_name",
             "record_2_id",
+            "record_2_name",
             "similarity_score",
             "hire_date_diff_days",
             "recommended_action",
@@ -676,6 +692,26 @@ class HRPipeline:
         payroll = transformed["payroll"]
         benefits = transformed["benefits"]
 
+        received_counts = {
+            "hris": len(sources["globaltech"]) + len(sources["acquiredco"]),
+            "payroll": len(sources["payroll"]),
+            "benefits": len(sources["benefits"]),
+        }
+        transformed_counts = {
+            "hris": len(employees),
+            "payroll": len(payroll),
+            "benefits": len(benefits),
+        }
+
+        for population, received_count in received_counts.items():
+            if received_count != transformed_counts[population]:
+                logger.error(
+                    "%s row count changed during cleaning from %s to %s",
+                    population,
+                    received_count,
+                    transformed_counts[population],
+                )
+
         if "salary_usd_annual" not in payroll.columns:
             logger.warning("No salary columns found after payroll transformation")
 
@@ -694,7 +730,35 @@ class HRPipeline:
 
         logger.info("Preparing final golden dataset...")
 
-        golden_dataset = prepare_golden_dataset(golden_dataset)
+        email_routed: list[pd.DataFrame] = []
+        golden_dataset = prepare_golden_dataset(golden_dataset, email_routed)
+
+        ledger = deduplication_result["row_ledger"]
+        routed = ledger["routed"]
+        if email_routed:
+            routed = pd.concat([routed, *email_routed], ignore_index=True)
+
+        disposition, reconciliation = reconcile_rows(
+            ledger["hris"],
+            ledger["payroll"],
+            ledger["benefits"],
+            golden_dataset,
+            routed,
+            ledger["payroll_ghost_rows"],
+            ledger["benefits_ghost_rows"],
+            ledger["id_alias"],
+        )
+        export_reconciliation(disposition, reconciliation, self.output_dir)
+        assert_rows_balanced(
+            disposition,
+            ledger["hris"],
+            ledger["payroll"],
+            ledger["benefits"],
+        )
+
+        golden_dataset = golden_dataset.drop(
+            columns=[column for column in golden_dataset.columns if str(column).startswith("_")]
+        )
 
         logger.info(
             "Golden dataset rows=%s",

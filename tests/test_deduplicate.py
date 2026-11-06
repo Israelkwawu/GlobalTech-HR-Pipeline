@@ -228,9 +228,10 @@ def test_fuzzy_review_does_not_merge_records():
     assert len(golden) == 2
     assert golden["probable_match"].all()
     assert set(review["match_method"]) == {"fuzzy_name"}
-    assert {"record_1_id", "record_2_id", "hire_date_diff_days", "recommended_action"} <= set(
+    assert {"record_1_id", "record_1_name", "record_2_id", "record_2_name", "hire_date_diff_days", "recommended_action"} <= set(
         review.columns
     )
+    assert set(review["record_1_name"]).union(review["record_2_name"]) == {"John Smith", "John Smyth"}
 
 
 def test_payroll_ghost_report_has_required_fields():

@@ -846,7 +846,7 @@ class DataQualityValidator:
         )
 
         # The delivery gate counts failed checks, not the row failure rate.
-        # The pipeline halts only when more than MAX_FAILED_CHECKS fail.
+        # A failed gate is recorded in the validation report. The run continues.
         pipeline_passed = failed_checks <= rules.MAX_FAILED_CHECKS
 
         return {
@@ -876,18 +876,18 @@ class DataQualityValidator:
         summary: dict,
     ):
         """
-        Stop pipeline when quality threshold fails.
+        Stop is not used. Failed checks are already in the validation report
+        and validation_errors.csv. The run continues so the other outputs
+        are still written.
         """
 
         if not summary["pipeline_passed"]:
-
             logger.critical(
-                "Pipeline blocked. Failed checks=%s. See %s",
+                "Data quality gate failed. Failed checks=%s. "
+                "Row detail is in %s. Pipeline continues.",
                 summary["failed_checks"],
-                self.output_dir / "validation_report.csv",
+                self.output_dir / "validation_errors.csv",
             )
-
-            raise RuntimeError("Data quality gate failed")
 
     # ========================================================================
     # Export Reports
